@@ -763,10 +763,11 @@ class EmbedBlockNode(
 ) :
     KsonValueNodeImpl(location) {
 
+    // TODO these also need to be processedStringContent like `embedContent`
     private val embedTag: String = embedTagNode?.stringContent ?: ""
     private val metadataTag: String = metadataTagNode?.stringContent ?: ""
     private val embedContent: String by lazy {
-        embedDelim.unescapeEmbedContent(embedContentNode.stringContent)
+        embedDelim.unescapeEmbedContent(embedContentNode.processedStringContent)
     }
 
     override fun toSourceInternal(indent: Indent, nextNode: AstNode?, compileTarget: CompileTarget): String {

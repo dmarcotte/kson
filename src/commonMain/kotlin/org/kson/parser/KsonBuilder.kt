@@ -221,8 +221,14 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
                         }
 
                         val embedContentNode = childMarkers.find { it.element == EMBED_CONTENT }?.let{
+                            /**
+                             * Ensure the embed_content is properly escaped so we can create a [QuotedStringNode]
+                             * around it
+                             */
+                            val ksonEscapedStringContent =
+                                StringQuote.SingleQuote.escapeQuotes(renderForJsonString(it.getValue()))
                             QuotedStringNode(
-                                StringQuote.SingleQuote.escapeQuotes(it.getValue()),
+                                ksonEscapedStringContent,
                                 StringQuote.SingleQuote,
                                 it.getLocation()
                             )
@@ -398,9 +404,9 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
 
         val embedContentProperty = propertiesMap[EmbedObjectKeys.EMBED_CONTENT.key] ?:
             throw ShouldNotHappenException("should have been validated for nullability above")
-        val escapedContent = EmbedDelim.Percent.escapeEmbedContent(embedContentProperty.processedStringContent)
+        val embedEscapedContent = EmbedDelim.Percent.escapeEmbedContent(embedContentProperty.stringContent)
         val embedContentValue = QuotedStringNode(
-            StringQuote.SingleQuote.escapeQuotes(escapedContent),
+            StringQuote.SingleQuote.escapeQuotes(embedEscapedContent),
             StringQuote.SingleQuote,
             embedContentProperty.location
         )
