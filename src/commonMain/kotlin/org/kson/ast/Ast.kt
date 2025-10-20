@@ -633,6 +633,14 @@ open class QuotedStringNode(
     }
 
     override fun toSourceInternal(indent: Indent, nextNode: AstNode?, compileTarget: CompileTarget): String {
+        if (StringUnquoted.isUnquotable(unquotedString)) {
+            /**
+             * This string does not require quotes in Kson, so we use the [renderUnquotableKsonString]
+             * to get the best rendering for this string across all compile targets
+             */
+            return renderUnquotableKsonString(unquotedString, indent, compileTarget)
+        }
+
         return when (compileTarget) {
             is Kson -> {
                 if (compileTarget.formatConfig.formattingStyle == CLASSIC) {
@@ -656,7 +664,8 @@ open class QuotedStringNode(
                                 }
 
                                 val escapedContent = chosenDelimiter.escapeQuotes(unquotedString)
-                                "${chosenDelimiter}$escapedContent${chosenDelimiter}"
+
+                                indent.firstLineIndent() + "${chosenDelimiter}$escapedContent${chosenDelimiter}"
                             }
                 }
             }
@@ -669,36 +678,48 @@ open class QuotedStringNode(
 }
 
 class UnquotedStringNode(override val stringContent: String, location: Location) : StringNodeImpl(location) {
-    val yamlReservedKeywords = setOf(
-        // Boolean true values
-        "y", "Y", "yes", "Yes", "YES",
-        "true", "True", "TRUE",
-        "on", "On", "ON",
-        // Boolean false values
-        "n", "N", "no", "No", "NO",
-        "false", "False", "FALSE",
-        "off", "Off", "OFF",
-        // Null values
-        "null", "Null", "NULL"
-    )
-
     override fun toSourceInternal(indent: Indent, nextNode: AstNode?, compileTarget: CompileTarget): String {
-        return when (compileTarget) {
-            is Kson -> {
-                if (compileTarget.formatConfig.formattingStyle == CLASSIC){
-                    return indent.firstLineIndent() + "\"${escapeRawWhitespace(DoubleQuote.escapeQuotes(stringContent))}\""
-                }else{
-                    indent.firstLineIndent() + stringContent
-                }
-            }
+        return renderUnquotableKsonString(stringContent, indent, compileTarget)
+    }
+}
 
-            is Yaml -> {
-                indent.firstLineIndent() + if (yamlReservedKeywords.contains(stringContent)) {
-                    "$DoubleQuote$stringContent$DoubleQuote"
-                } else {
-                    stringContent
-                }
+private val yamlReservedKeywords = setOf(
+    // Boolean true values
+    "y", "Y", "yes", "Yes", "YES",
+    "true", "True", "TRUE",
+    "on", "On", "ON",
+    // Boolean false values
+    "n", "N", "no", "No", "NO",
+    "false", "False", "FALSE",
+    "off", "Off", "OFF",
+    // Null values
+    "null", "Null", "NULL"
+)
+
+/**
+ * Render helper for unquoted KSON strings, i.e. [String]s for which [StringUnquoted.isUnquotable] returns true.
+ * NOTE: the caller is responsible for ensuring [StringUnquoted.isUnquotable] returns true on [unquotedKsonString]
+ */
+private fun renderUnquotableKsonString(unquotedKsonString: String, indent: Indent, compileTarget: CompileTarget): String {
+    return when (compileTarget) {
+        is Kson -> {
+            if (compileTarget.formatConfig.formattingStyle == CLASSIC){
+                return indent.firstLineIndent() + "\"${unquotedKsonString}\""
+            }else{
+                indent.firstLineIndent() + unquotedKsonString
             }
+        }
+
+        is Yaml -> {
+            indent.firstLineIndent() + if (yamlReservedKeywords.contains(unquotedKsonString)) {
+                "$DoubleQuote$unquotedKsonString$DoubleQuote"
+            } else {
+                unquotedKsonString
+            }
+        }
+
+        is Json -> {
+            indent.firstLineIndent() + "\"${renderForJsonString(unquotedKsonString)}\""
         }
     }
 }
