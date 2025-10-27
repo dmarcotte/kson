@@ -83,15 +83,13 @@ enum class MessageType(
     },
     EMBED_BLOCK_NO_NEWLINE {
         override fun expectedArgs(): List<String> {
-            return listOf("Embed delimiter", "Embed tag")
+            return listOf("Embed delimiter")
         }
 
         override fun doFormat(parsedArgs: ParsedErrorArgs): String {
             val embedDelimiter = parsedArgs.getArg("Embed delimiter")
-            val embedTag = parsedArgs.getArg("Embed tag")
-            return "Embedded content starts on the first line after the \"$embedDelimiter<embed tag>\" " +
-                    "construct, so this \"$embedDelimiter\" cannot be on be on the same line as the opening " +
-                    "\"$embedDelimiter$embedTag\""
+            return "Embedded content starts on the first line after the opening \"$embedDelimiter...\" " +
+                    "construct, so this embed-end \"$embedDelimiter$embedDelimiter\" must be on a new line"
         }
     },
     EOF_NOT_REACHED {

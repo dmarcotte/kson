@@ -5,6 +5,7 @@ import org.kson.parser.ParsedElementType.*
 import org.kson.parser.TokenType.*
 import org.kson.parser.behavior.embedblock.EmbedDelim
 import org.kson.parser.behavior.StringQuote
+import org.kson.parser.behavior.StringQuote.EmbedTagQuote
 import org.kson.parser.behavior.embedblock.EmbedObjectKeys
 import org.kson.parser.messages.CoreParseMessage
 import org.kson.parser.messages.Message
@@ -399,8 +400,27 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
          */
         if (!EmbedObjectKeys.canBeDecoded(propertiesMap)) { return null }
 
-        val embedMetadataValue = propertiesMap[EmbedObjectKeys.EMBED_METADATA.key]
-        val embedTagValue = propertiesMap[EmbedObjectKeys.EMBED_TAG.key]
+        val embedTagString = propertiesMap[EmbedObjectKeys.EMBED_TAG.key]
+        val embedTagNode = embedTagString?.let {
+            val embedTagEscapedContent = EmbedTagQuote.escapeQuotes(it.stringContent)
+                // also ensure there are no raw newlines - raw newline would put us inside the embed content
+                .replace("\n", "\\n")
+            QuotedStringNode(
+                StringQuote.SingleQuote.escapeQuotes(embedTagEscapedContent),
+                StringQuote.SingleQuote,
+                it.location
+            )
+        }
+
+        val embedMetadataString = propertiesMap[EmbedObjectKeys.EMBED_METADATA.key]
+        val embedMetadataNode = embedMetadataString?.let {
+            val embedMetaEscapedContent = it.stringContent.replace("\n", "\\n")
+            QuotedStringNode(
+                StringQuote.SingleQuote.escapeQuotes(embedMetaEscapedContent),
+                StringQuote.SingleQuote,
+                it.location
+            )
+        }
 
         val embedContentProperty = propertiesMap[EmbedObjectKeys.EMBED_CONTENT.key] ?:
             throw ShouldNotHappenException("should have been validated for nullability above")
@@ -412,8 +432,8 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
         )
 
         return EmbedBlockNode(
-                embedTagValue,
-                embedMetadataValue,
+                embedTagNode,
+                embedMetadataNode,
                 embedContentValue,
                 EmbedDelim.Percent,
                 location

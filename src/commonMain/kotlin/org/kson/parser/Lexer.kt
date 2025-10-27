@@ -364,7 +364,14 @@ class Lexer(source: String, gapFree: Boolean = false) {
             ',' -> addLiteralToken(COMMA)
             '"', '\'' -> {
                 addLiteralToken(STRING_OPEN_QUOTE)
-                quotedString(char)
+                quotedString({ it.peek() != char })
+                if (sourceScanner.eof()) {
+                    return
+                } else {
+                    // not at EOF, so we must be looking at the quote that ends this string
+                    sourceScanner.advance()
+                    addLiteralToken(STRING_CLOSE_QUOTE)
+                }
             }
             Percent.char, Dollar.char -> {
                 addLiteralToken(EMBED_OPEN_DELIM)
@@ -427,9 +434,16 @@ class Lexer(source: String, gapFree: Boolean = false) {
         addToken(type, lexeme, lexeme.text)
     }
 
-    private fun quotedString(delimiter: Char) {
+    /**
+     * Lexes a quoted string. NOTE: callers are responsibly for lexing their opening and closing quotes.
+     *
+     * @param stillInStringPredicate a lamba which returns true if the given [SourceScanner] is still in the quoted
+     *   string, and false otherwise. Usually checking for whatever the caller considers a close quote, but is more
+     *   involved for our custom embed tag and metadata syntax
+     */
+    private fun quotedString(stillInStringPredicate: (SourceScanner) -> Boolean) {
         var hasUntokenizedStringCharacters = false
-        while (sourceScanner.peek() != delimiter) {
+        while (stillInStringPredicate(sourceScanner)) {
             val nextStringChar = sourceScanner.peek() ?: break
 
             // check for illegal control characters
@@ -458,7 +472,7 @@ class Lexer(source: String, gapFree: Boolean = false) {
 
                     // a '\u' unicode escape must be 4 chars long
                     for (c in 1..4) {
-                        if (sourceScanner.peek() == delimiter || sourceScanner.eof()) {
+                        if (!stillInStringPredicate(sourceScanner) || sourceScanner.eof()) {
                             break
                         }
                         sourceScanner.advance()
@@ -480,14 +494,6 @@ class Lexer(source: String, gapFree: Boolean = false) {
 
         if (hasUntokenizedStringCharacters) {
             addLiteralToken(STRING_CONTENT)
-        }
-
-        if (sourceScanner.eof()) {
-            return
-        } else {
-            // not at EOF, so we must be looking at the quote that ends this string
-            sourceScanner.advance()
-            addLiteralToken(STRING_CLOSE_QUOTE)
         }
     }
 
@@ -517,35 +523,14 @@ class Lexer(source: String, gapFree: Boolean = false) {
             }
 
             // we have an embed tag, let's scan it
-            while (stillInEmbedPreamble(delimChar)
-                && sourceScanner.peek() != ':') {
-                sourceScanner.advance()
-            }
-
-            // extract our embed tag (note: may be empty, that's supported)
-            val embedTagLexeme = sourceScanner.extractLexeme()
-            addToken(
-                EMBED_TAG, embedTagLexeme,
-                // trim any trailing whitespace from the embed tag's value
-                embedTagLexeme.text.trim()
-            )
+            quotedString({ stillInEmbedPreamble(delimChar) && it.peek() != ':' })
 
             if(sourceScanner.peek() == ':') {
                 sourceScanner.advance()
                 addLiteralToken(EMBED_TAG_STOP)
 
                 // scan any metadata given in the preamble
-                while (stillInEmbedPreamble(delimChar)) {
-                    sourceScanner.advance()
-                }
-
-                // extract our embed metadata (note: may be empty, that's supported)
-                val embedMetadataLexeme = sourceScanner.extractLexeme()
-                addToken(
-                    EMBED_METADATA, embedMetadataLexeme,
-                    // trim any trailing whitespace from the embed tag's value
-                    embedMetadataLexeme.text.trim()
-                )
+                quotedString { stillInEmbedPreamble(delimChar) }
             }
 
             // lex this premature embed end

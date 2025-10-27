@@ -71,7 +71,7 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
 
         assertParsesTo(
             """
-                %sql: ::::::::::::database:::::: 
+                %sql: ::::::::::::database::::::
                     select * from something
                 %%
             """,
@@ -354,6 +354,163 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
                   "embedBlock": {
                     "embedContent": "content\n",
                     "unrelatedKey": "is not an embed block"
+                  }
+                }
+            """.trimIndent(), compileSettings = compileSettings
+        )
+    }
+
+    @Test
+    fun testEmbedBlockFromObjectWithEscapes(){
+        val compileSettings = KsonCoreTest.CompileSettings(
+            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
+            jsonSettings = Json(retainEmbedTags = true)
+        )
+
+        assertParsesTo(
+            """
+               {
+                  "embedBlock": {
+                    "embedTag": " \n\\t ",
+                    "embedMetadata": " \\x\n ",
+                    "embedContent": ""
+                  }
+                }
+            """.trimIndent(),
+            """
+                embedBlock: % \n\\t :  \\x\n 
+                  %%
+            """.trimIndent(),
+            """
+               |embedBlock:
+               |  embedTag: " \n\\t "
+               |  embedMetadata: " \\x\n "
+               |  embedContent: |
+               |    
+            """.trimMargin(),
+            """
+                {
+                  "embedBlock": {
+                    "embedTag": " \n\\t ",
+                    "embedMetadata": " \\x\n ",
+                    "embedContent": ""
+                  }
+                }
+            """.trimIndent(), compileSettings = compileSettings
+        )
+    }
+
+    @Test
+    fun testEmbedBlockPreambleWithTrickyChars() {
+        val compileSettings = KsonCoreTest.CompileSettings(
+            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
+            jsonSettings = Json(retainEmbedTags = true)
+        )
+
+        assertParsesTo(
+            """
+               embedBlock: %colons\:in\\\:tag: quotes ' in metadata
+                  %%
+            """.trimIndent(),
+            """
+                embedBlock: %colons\:in\\\:tag: quotes ' in metadata
+                  %%
+            """.trimIndent(),
+            """
+               |embedBlock:
+               |  embedTag: "colons:in\\:tag"
+               |  embedMetadata: "quotes ' in metadata"
+               |  embedContent: |
+               |    
+            """.trimMargin(),
+            """
+                {
+                  "embedBlock": {
+                    "embedTag": "colons:in\\:tag",
+                    "embedMetadata": "quotes ' in metadata",
+                    "embedContent": ""
+                  }
+                }
+            """.trimIndent(), compileSettings = compileSettings
+        )
+    }
+
+    @Test
+    fun testEmbedBlockPreambleFromObjectWithTrickyChars() {
+        val compileSettings = KsonCoreTest.CompileSettings(
+            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
+            jsonSettings = Json(retainEmbedTags = true)
+        )
+
+        assertParsesTo(
+            """
+               {
+                  "embedBlock": {
+                    "embedTag": "colons:in\\:tag",
+                    "embedMetadata": "quotes ' in metadata",
+                    "embedContent": ""
+                  }
+                }
+            """.trimIndent(),
+            """
+                embedBlock: %colons\:in\\\:tag: quotes ' in metadata
+                  %%
+            """.trimIndent(),
+            """
+               |embedBlock:
+               |  embedTag: "colons:in\\:tag"
+               |  embedMetadata: "quotes ' in metadata"
+               |  embedContent: |
+               |    
+            """.trimMargin(),
+            """
+                {
+                  "embedBlock": {
+                    "embedTag": "colons:in\\:tag",
+                    "embedMetadata": "quotes ' in metadata",
+                    "embedContent": ""
+                  }
+                }
+            """.trimIndent(), compileSettings = compileSettings
+        )
+    }
+
+    @Test
+    fun testEmbedBlockPreambleFromObjectWithRawNewlines() {
+        val compileSettings = KsonCoreTest.CompileSettings(
+            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
+            jsonSettings = Json(retainEmbedTags = true)
+        )
+
+        assertParsesTo(
+            """
+               {
+                  "embedBlock": {
+                    "embedTag": "embedTag
+               raw newline",
+                    "embedMetadata": "metadata
+               raw newline",
+                    "embedContent": ""
+                  }
+                }
+            """.trimIndent(),
+            """
+                embedBlock: %embedTag\nraw newline: metadata\nraw newline
+                  %%
+            """.trimIndent(),
+            """
+               |embedBlock:
+               |  embedTag: "embedTag\nraw newline"
+               |  embedMetadata: "metadata\nraw newline"
+               |  embedContent: |
+               |    
+            """.trimMargin(),
+            """
+                {
+                  "embedBlock": {
+                    "embedTag": "embedTag\nraw newline",
+                    "embedMetadata": "metadata\nraw newline",
+                    "embedContent": ""
                   }
                 }
             """.trimIndent(), compileSettings = compileSettings

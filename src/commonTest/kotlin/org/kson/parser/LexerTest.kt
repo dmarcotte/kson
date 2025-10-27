@@ -418,7 +418,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertTokenizesTo(
@@ -427,7 +427,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_TAG_STOP, EMBED_METADATA, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertTokenizesTo(
@@ -436,7 +436,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_TAG_STOP, EMBED_METADATA, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
         assertTokenizesTo(
             """
@@ -444,7 +444,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_TAG_STOP, EMBED_METADATA, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
     }
 
@@ -470,7 +470,7 @@ class LexerTest {
                                 the leftmost line
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertEquals(
@@ -494,7 +494,7 @@ class LexerTest {
                 which is the end delimiter in this case
               %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertEquals(
@@ -577,7 +577,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM),
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM),
             "should allow trailing whitespace after the opening '%embedTag'"
         )
     }
@@ -600,7 +600,7 @@ class LexerTest {
             some sweet content
             %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertTokenizesTo(
@@ -609,7 +609,7 @@ class LexerTest {
             some sweet content
             %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_TAG_STOP, EMBED_METADATA, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertTokenizesTo(
@@ -618,7 +618,7 @@ class LexerTest {
             some sweet content
             %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG, EMBED_TAG_STOP, EMBED_METADATA, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, STRING_ESCAPE, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
     }
 
@@ -906,13 +906,13 @@ class LexerTest {
     fun testHashInEmbedTag() {
         assertTokenizesTo(
             "%%# should not be a comment",
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG),
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT),
             testGapFreeLexing = true
         )
 
         assertTokenizesTo(
             "%%also # should not be a comment",
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG),
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT),
             testGapFreeLexing = true
         )
     }

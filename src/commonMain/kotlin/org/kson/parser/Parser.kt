@@ -33,9 +33,10 @@ import org.kson.stdlibx.exceptions.FatalParseException
  *              | "[" ( ksonValue ","? )* "]"
  * literal -> string | NUMBER | "true" | "false" | "null"
  * keyword -> string ":"
- * string -> (STRING_OPEN_QUOTE STRING_CONTENT STRING_CLOSE_QUOTE) | UNQUOTED_STRING
- * embedBlock -> EMBED_OPEN_DELIM EMBED_PREAMBLE EMBED_PREAMBLE_NEWLINE CONTENT EMBED_CLOSE_DELIM
- * EMBED_PREAMBLE -> EMBED_TAG (":" EMBED_METADATA)?
+ * string -> (STRING_OPEN_QUOTE string_content STRING_CLOSE_QUOTE) | UNQUOTED_STRING
+ * string_content -> (STRING_CONTENT | STRING_ILLEGAL_CONTROL_CHARACTER | STRING_UNICODE_ESCAPE | STRING_ESCAPE)*
+ * embedBlock -> EMBED_OPEN_DELIM embed_preamble EMBED_PREAMBLE_NEWLINE CONTENT EMBED_CLOSE_DELIM
+ * embed_preamble -> string_content (":" string_content)?
  * ```
  *
  * See [section 5.1 here](https://craftinginterpreters.com/representing-code.html#context-free-grammars)
@@ -549,7 +550,7 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
     }
 
     /**
-     * string -> (STRING_OPEN_QUOTE STRING STRING_CLOSE_QUOTE) | UNQUOTED_STRING
+     * string -> (STRING_OPEN_QUOTE string_content STRING_CLOSE_QUOTE) | UNQUOTED_STRING
      */
     private fun string(): Boolean {
         if (builder.getTokenType() == UNQUOTED_STRING) {
@@ -566,10 +567,46 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
 
         val stringMark = builder.mark()
         val possiblyUnclosedString = builder.mark()
-        // consume our open quote
+
+        // consume the open quote
         builder.advanceLexer()
 
-        while (builder.getTokenType() != STRING_CLOSE_QUOTE && !builder.eof()) {
+        val contentParsed = stringContent(standardStringEndToken)
+
+        if (!contentParsed) {
+            stringMark.rollbackTo()
+            return false
+        }
+
+        if (builder.eof()) {
+            possiblyUnclosedString.error(STRING_NO_CLOSE.create())
+        } else {
+            // consume our close quote
+            builder.advanceLexer()
+            // string is closed, don't need this marker
+            possiblyUnclosedString.drop()
+        }
+
+        stringMark.done(QUOTED_STRING)
+
+        return contentParsed
+    }
+
+    /**
+     * string_content -> (STRING_CONTENT | STRING_ILLEGAL_CONTROL_CHARACTER | STRING_UNICODE_ESCAPE | STRING_ESCAPE)*
+     *
+     * @param closeQuoteTokenTypes the set of tokens delimit the end of this [stringContent]
+     * @param forEmbedTag we need to do a bit of special work around respecting : escapes in embed tags. This feels
+     *   like somewhat of a hack, being such a hyper-specific param this case, it is fairly isolated to this parse,
+     *   so we'll accept the hack (for now??)
+     */
+    private fun stringContent(closeQuoteTokenTypes: Set<TokenType>, forEmbedTag: Boolean = false): Boolean {
+        if (closeQuoteTokenTypes.contains(builder.getTokenType())) {
+            // empty string!
+            return true
+        }
+
+        while (!closeQuoteTokenTypes.contains(builder.getTokenType()) && !builder.eof()) {
             when (builder.getTokenType()) {
                 STRING_CONTENT -> builder.advanceLexer()
                 STRING_UNICODE_ESCAPE -> {
@@ -587,7 +624,9 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
                     val stringEscapeMark = builder.mark()
                     val stringEscapeText = builder.getTokenText()
                     builder.advanceLexer()
-                    if (isValidStringEscape(stringEscapeText)) {
+                    if (isValidStringEscape(stringEscapeText)
+                        // if this string being parsed for an embedTag, then ':' may be escaped
+                        || (forEmbedTag && stringEscapeText == "\\:")) {
                         stringEscapeMark.drop()
                     } else {
                         stringEscapeMark.error(STRING_BAD_ESCAPE.create(stringEscapeText))
@@ -602,22 +641,11 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
                 }
 
                 else -> {
-                    stringMark.rollbackTo()
                     return false
                 }
             }
         }
 
-        if (builder.eof()) {
-            possiblyUnclosedString.error(STRING_NO_CLOSE.create())
-        } else {
-            // string is closed, don't need this marker
-            possiblyUnclosedString.drop()
-            // consume our close quote
-            builder.advanceLexer()
-        }
-
-        stringMark.done(QUOTED_STRING)
         return true
     }
 
@@ -636,45 +664,30 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
     }
 
     /**
-     * EMBED_PREAMBLE -> EMBED_TAG (":" EMBED_METADATA)?
+     * embed_preamble -> string_content (":" string_content)?
      *
      * Note: the preamble may be empty, so this always "succeeds" in parsing its rule
-     * @return the text of the parsed embed preamble (possibly empty)
      */
-    private fun embedPreamble(): String {
-        val embedTagMark = builder.mark()
-        val embedTag = if (builder.getTokenType() == EMBED_TAG) {
-            val tagText = builder.getTokenText()
-            builder.advanceLexer()
-            embedTagMark.done(EMBED_TAG)
-            
-            // Check for optional meta tag
-            val embedMeta = if (builder.getTokenType() == EMBED_TAG_STOP) {
-                val embedTagDelim = builder.mark()
-                builder.advanceLexer()
-                embedTagDelim.done(EMBED_TAG_STOP)
-
-                val metaTagMark = builder.mark()
-                val metaText = builder.getTokenText()
-                builder.advanceLexer()
-                metaTagMark.done(EMBED_METADATA)
-                metaText
-            } else {
-                ""
-            }
-            
-            // Combine tags if both present
-            if (embedMeta.isNotEmpty()) {
-                "$tagText:$embedMeta"
-            } else {
-                tagText
-            }
-        } else {
-            embedTagMark.drop()
-            ""
+    private fun embedPreamble() {
+        if (builder.getTokenType() == EMBED_PREAMBLE_NEWLINE) {
+            return
         }
-        
-        return embedTag
+
+        if (builder.getTokenType() != EMBED_TAG_STOP) {
+            val embedTagMark = builder.mark()
+            stringContent(embedTagEndTokens, true)
+            embedTagMark.done(EMBED_TAG)
+        }
+            
+        // Check for optional meta tag
+        if (builder.getTokenType() == EMBED_TAG_STOP) {
+            // advance past our EMBED_TAG_STOP
+            builder.advanceLexer()
+
+            val metaTagMark = builder.mark()
+            stringContent(embedMetadataEndTokens)
+            metaTagMark.done(EMBED_METADATA)
+        }
     }
 
     private fun isValidUnicodeEscape(unicodeEscapeText: String): Boolean {
@@ -700,7 +713,7 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
     }
 
     /**
-     * embedBlock -> EMBED_OPEN_DELIM (EMBED_TAG) EMBED_PREAMBLE_NEWLINE CONTENT EMBED_CLOSE_DELIM
+     * embedBlock -> EMBED_OPEN_DELIM embed_preamble EMBED_PREAMBLE_NEWLINE CONTENT EMBED_CLOSE_DELIM
      */
     private fun embedBlock(): Boolean {
         if (builder.getTokenType() == EMBED_OPEN_DELIM) {
@@ -711,7 +724,7 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
             builder.advanceLexer()
             embedBlockStartDelimMark.done(EMBED_OPEN_DELIM)
 
-            val embedPreambleText = embedPreamble()
+            embedPreamble()
 
             val prematureEndMark = builder.mark()
             if (builder.getTokenType() == EMBED_CLOSE_DELIM) {
@@ -720,7 +733,7 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
                  * We are seeing a closing [EMBED_CLOSE_DELIM] before we encountered an [EMBED_PREAMBLE_NEWLINE],
                  * so give an error to help the user fix this construct
                  */
-                prematureEndMark.error(EMBED_BLOCK_NO_NEWLINE.create(embedStartDelimiter, embedPreambleText))
+                prematureEndMark.error(EMBED_BLOCK_NO_NEWLINE.create(embedStartDelimiter))
                 embedBlockMark.done(EMBED_BLOCK)
                 return true
             } else {
@@ -831,3 +844,7 @@ private val validHexChars = setOf(
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'
 )
+
+private val standardStringEndToken = setOf(STRING_CLOSE_QUOTE)
+private val embedTagEndTokens = setOf(EMBED_TAG_STOP, EMBED_PREAMBLE_NEWLINE)
+private val embedMetadataEndTokens = setOf(EMBED_PREAMBLE_NEWLINE)

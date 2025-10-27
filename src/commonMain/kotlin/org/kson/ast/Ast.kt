@@ -784,8 +784,11 @@ class EmbedBlockNode(
 ) :
     KsonValueNodeImpl(location) {
 
-    // TODO these also need to be processedStringContent like `embedContent`
-    private val embedTag: String = embedTagNode?.stringContent ?: ""
+    private val embedTag: String = if (embedTagNode != null) {
+        EmbedTagQuote.unescapeQuotes(embedTagNode.stringContent)
+    } else {
+        ""
+    }
     private val metadataTag: String = metadataTagNode?.stringContent ?: ""
     private val embedContent: String by lazy {
         embedDelim.unescapeEmbedContent(embedContentNode.processedStringContent)
@@ -807,7 +810,7 @@ class EmbedBlockNode(
      */
     private fun renderKsonFormat(indent: Indent, compileTarget: Kson): String {
         val (delimiter, content) = selectOptimalDelimiter()
-        val embedPreamble = embedTag + if (metadataTag.isNotEmpty()) ": $metadataTag" else ""
+        val embedPreamble = EmbedTagQuote.escapeQuotes(embedTag) + if (metadataTag.isNotEmpty()) ": $metadataTag" else ""
 
         return when (compileTarget.formatConfig.formattingStyle) {
             PLAIN, DELIMITED -> {
