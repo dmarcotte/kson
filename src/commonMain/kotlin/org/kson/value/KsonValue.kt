@@ -76,14 +76,13 @@ class KsonList(val elements: List<KsonValue>, location: Location) : KsonValue(lo
 
 class EmbedBlock(
     val embedTag: KsonString?,
-    val metadataTag: KsonString?,
     val embedContent: KsonString,
                  location: Location) : KsonValue(location) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is EmbedBlock) return false
         
-        return embedTag == other.embedTag && metadataTag == other.metadataTag && embedContent == other.embedContent
+        return embedTag == other.embedTag && embedContent == other.embedContent
     }
 
     fun asKsonObject(): KsonObject {
@@ -93,10 +92,6 @@ class EmbedBlock(
                     val embedTagKey = KsonString(EmbedObjectKeys.EMBED_TAG.key, embedTag.location)
                     put(embedTagKey.value, KsonObjectProperty(embedTagKey, it))
                 }
-                metadataTag?.let {
-                    val embedMetadataKey = KsonString(EmbedObjectKeys.EMBED_METADATA.key, metadataTag.location)
-                    put(embedMetadataKey.value, KsonObjectProperty(embedMetadataKey, it))
-                }
                 val embedContentKey = KsonString(EmbedObjectKeys.EMBED_CONTENT.key, embedContent.location)
                 put(embedContentKey. value, KsonObjectProperty(embedContentKey, embedContent))
             },
@@ -105,7 +100,7 @@ class EmbedBlock(
     }
 
     override fun hashCode(): Int {
-        return 31 * embedTag.hashCode() + 31 * metadataTag.hashCode() + 31 * embedContent.hashCode()
+        return 31 * embedTag.hashCode() + 31 * embedContent.hashCode()
     }
 }
 
@@ -201,7 +196,6 @@ fun AstNode.toKsonValue(): KsonValue {
         }, location)
         is EmbedBlockNode -> EmbedBlock(
             embedTagNode?.toKsonValue() as? KsonString,
-            metadataTagNode?.toKsonValue() as? KsonString,
             embedContentNode.toKsonValue() as KsonString,
             location
         )

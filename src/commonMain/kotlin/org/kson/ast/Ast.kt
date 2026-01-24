@@ -777,19 +777,13 @@ class NullNode(location: Location) : KsonValueNodeImpl(location) {
 
 class EmbedBlockNode(
     val embedTagNode: StringNodeImpl?,
-    val metadataTagNode: StringNodeImpl?,
     val embedContentNode: StringNodeImpl,
     embedDelim: EmbedDelim,
     location: Location
 ) :
     KsonValueNodeImpl(location) {
 
-    private val embedTag: String = if (embedTagNode != null) {
-        EmbedTagQuote.unescapeQuotes(embedTagNode.stringContent)
-    } else {
-        ""
-    }
-    private val metadataTag: String = metadataTagNode?.stringContent ?: ""
+    private val embedTag: String = embedTagNode?.stringContent ?: ""
     private val embedContent: String by lazy {
         embedDelim.unescapeEmbedContent(embedContentNode.processedStringContent)
     }
@@ -810,16 +804,15 @@ class EmbedBlockNode(
      */
     private fun renderKsonFormat(indent: Indent, compileTarget: Kson): String {
         val (delimiter, content) = selectOptimalDelimiter()
-        val embedPreamble = EmbedTagQuote.escapeQuotes(embedTag) + if (metadataTag.isNotEmpty()) ": $metadataTag" else ""
 
         return when (compileTarget.formatConfig.formattingStyle) {
             PLAIN, DELIMITED -> {
                 val indentedContent = content.lines().joinToString("\n${indent.bodyLinesIndent()}") { it }
-                "${indent.firstLineIndent()}${delimiter.openDelimiter}$embedPreamble\n${indent.bodyLinesIndent()}$indentedContent${delimiter.closeDelimiter}"
+                "${indent.firstLineIndent()}${delimiter.openDelimiter}$embedTag\n${indent.bodyLinesIndent()}$indentedContent${delimiter.closeDelimiter}"
             }
             COMPACT -> {
                 val compactContent = content.lines().joinToString("\n") { it }
-                "${delimiter.openDelimiter}$embedPreamble\n$compactContent${delimiter.closeDelimiter}"
+                "${delimiter.openDelimiter}$embedTag\n$compactContent${delimiter.closeDelimiter}"
             }
             CLASSIC -> {
                 renderJsonFormat(indent, compileTarget as? Json ?: Json())
@@ -889,13 +882,9 @@ class EmbedBlockNode(
             "${nextIndent.bodyLinesIndent()}\"${EmbedObjectKeys.EMBED_TAG.key}\": \"$embedTag\",\n"
         } else ""
 
-        val metadataTagLine = if (metadataTag.isNotEmpty()) {
-            "${nextIndent.bodyLinesIndent()}\"${EmbedObjectKeys.EMBED_METADATA.key}\": \"$metadataTag\",\n"
-        } else ""
-
         return """
             |${indent.firstLineIndent()}{
-            |$embedTagLine$metadataTagLine${nextIndent.bodyLinesIndent()}"${EmbedObjectKeys.EMBED_CONTENT.key}": "${renderForJsonString(embedContent)}"
+            |$embedTagLine${nextIndent.bodyLinesIndent()}"${EmbedObjectKeys.EMBED_CONTENT.key}": "${renderForJsonString(embedContent)}"
             |${indent.bodyLinesIndent()}}
         """.trimMargin()
     }
@@ -911,11 +900,7 @@ class EmbedBlockNode(
             "${indent.firstLineIndent()}${EmbedObjectKeys.EMBED_TAG.key}: \"$embedTag\"\n"
         } else ""
 
-        val metadataTagLine = if (metadataTag.isNotEmpty()) {
-            "${indent.firstLineIndent()}${EmbedObjectKeys.EMBED_METADATA.key}: \"$metadataTag\"\n"
-        } else ""
-
-        return embedTagLine + metadataTagLine +
+        return embedTagLine +
                 "${indent.firstLineIndent()}${EmbedObjectKeys.EMBED_CONTENT.key}: " +
                 renderMultilineYamlString(embedContent, indent.clone(true), indent.next(true))
     }

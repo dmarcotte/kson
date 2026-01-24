@@ -427,7 +427,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertTokenizesTo(
@@ -436,7 +436,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
         assertTokenizesTo(
             """
@@ -444,7 +444,7 @@ class LexerTest {
                     select * from something
                 %%
             """,
-            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
     }
 
@@ -609,7 +609,7 @@ class LexerTest {
             some sweet content
             %%
             """,
-            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
 
         assertTokenizesTo(
@@ -618,7 +618,7 @@ class LexerTest {
             some sweet content
             %%
             """,
-            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, EMBED_TAG_STOP, STRING_CONTENT, STRING_ESCAPE, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
+            listOf(EMBED_OPEN_DELIM, STRING_CONTENT, STRING_ESCAPE, EMBED_PREAMBLE_NEWLINE, EMBED_CONTENT, EMBED_CLOSE_DELIM)
         )
     }
 

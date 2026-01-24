@@ -22,7 +22,6 @@ import org.kson.value.KsonBoolean as InternalKsonBoolean
 import org.kson.value.KsonNull as InternalKsonNull
 import org.kson.value.EmbedBlock as InternalEmbedBlock
 import kotlin.js.JsExport
-import kotlin.js.JsName
 
 /**
  * The [Kson](https://kson.org) language
@@ -278,8 +277,6 @@ enum class TokenType {
     EMBED_OPEN_DELIM,
     EMBED_CLOSE_DELIM,
     EMBED_TAG,
-    EMBED_TAG_STOP,
-    EMBED_METADATA,
     EMBED_PREAMBLE_NEWLINE,
     EMBED_CONTENT,
     FALSE,
@@ -330,7 +327,7 @@ private fun convertTokens(internalTokens: List<InternalToken>): List<Token> {
         val currentToken = internalTokens[i]
 
         when (currentToken.tokenType) {
-            InternalTokenType.STRING_OPEN_QUOTE -> {
+            InternalTokenType.STRING_OPEN_QUOTE, InternalTokenType.STRING_CONTENT -> {
                 // we collapse all string content tokens into one for the public API (our internals track more
                 // refined string content tokens to produce better errors, but those refined tokens are
                 // not needed by outside clients)
@@ -367,15 +364,18 @@ private fun convertTokens(internalTokens: List<InternalToken>): List<Token> {
                     if (internalTokens[i].tokenType == InternalTokenType.STRING_CLOSE_QUOTE) {
                         val closeQuoteToken = internalTokens[i]
                         tokens.add(createPublicToken(TokenType.STRING_CLOSE_QUOTE, closeQuoteToken))
+                    } else if(internalTokens[i].tokenType == InternalTokenType.EMBED_PREAMBLE_NEWLINE) {
+                        // dm todo this needs to be refactored
+                        tokens.add(createPublicToken(TokenType.EMBED_PREAMBLE_NEWLINE, internalTokens[i]))
                     } else if (internalTokens[i].tokenType != InternalTokenType.EOF) {
                         throw IllegalStateException("Bug: a string must end with a closing quote token or EOF")
                     }
                 }
 
             }
-            // String content tokens are handled above in STRING_OPEN_QUOTE case
-            InternalTokenType.STRING_CONTENT,
+            // String content tokens are handled above in STRING_OPEN_QUOTE/STRING_CONTENT case
             InternalTokenType.STRING_CLOSE_QUOTE,
+            InternalTokenType.EMBED_PREAMBLE_NEWLINE,
             InternalTokenType.STRING_ILLEGAL_CONTROL_CHARACTER,
             InternalTokenType.STRING_UNICODE_ESCAPE,
             InternalTokenType.STRING_ESCAPE -> {
@@ -424,9 +424,6 @@ private fun convertTokens(internalTokens: List<InternalToken>): List<Token> {
             InternalTokenType.EMBED_TAG -> {
                 tokens.add(createPublicToken(TokenType.EMBED_TAG, currentToken))
             }
-            InternalTokenType.EMBED_PREAMBLE_NEWLINE -> {
-                tokens.add(createPublicToken(TokenType.EMBED_PREAMBLE_NEWLINE, currentToken))
-            }
             InternalTokenType.EMBED_CONTENT -> {
                 tokens.add(createPublicToken(TokenType.EMBED_CONTENT, currentToken))
             }
@@ -456,12 +453,6 @@ private fun convertTokens(internalTokens: List<InternalToken>): List<Token> {
             }
             InternalTokenType.EOF -> {
                 tokens.add(createPublicToken(TokenType.EOF, currentToken))
-            }
-            InternalTokenType.EMBED_METADATA -> {
-                tokens.add(createPublicToken(TokenType.EMBED_METADATA, currentToken))
-            }
-            InternalTokenType.EMBED_TAG_STOP -> {
-                tokens.add(createPublicToken(TokenType.EMBED_TAG_STOP, currentToken))
             }
         }
         i++
@@ -549,7 +540,6 @@ internal fun convertValue(ksonValue: InternalKsonValue): KsonValue {
         is InternalEmbedBlock -> {
             KsonValue.KsonEmbed(
                 tag = ksonValue.embedTag?.value,
-                metadata = ksonValue.metadataTag?.value,
                 content = ksonValue.embedContent.value,
                 internalStart = Position(ksonValue.location.start),
                 internalEnd = Position(ksonValue.location.end)
@@ -664,7 +654,6 @@ sealed class KsonValue(val start: Position, val end: Position) {
      */
     class KsonEmbed internal constructor(
         val tag: String?,
-        val metadata: String?,
         val content: String,
         internalStart: Position,
         internalEnd: Position

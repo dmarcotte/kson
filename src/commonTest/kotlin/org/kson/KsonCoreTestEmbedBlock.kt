@@ -284,17 +284,17 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
                 content%%
             """.trimIndent(),
             """
-                %: meta
+                %:meta
                 content%%
             """.trimIndent(),
             """
-                embedMetadata: "meta"
+                embedTag: ":meta"
                 embedContent: |
                   content
             """.trimIndent(),
             """
                 {
-                  "embedMetadata": "meta",
+                  "embedTag": ":meta",
                   "embedContent": "content"
                 }
             """.trimIndent(), compileSettings = compileSettings
@@ -372,19 +372,17 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
                {
                   "embedBlock": {
                     "embedTag": " \n\\t ",
-                    "embedMetadata": " \\x\n ",
                     "embedContent": ""
                   }
                 }
             """.trimIndent(),
             """
-                embedBlock: % \n\\t :  \\x\n 
+                embedBlock: % \n\\t 
                   %%
             """.trimIndent(),
             """
                |embedBlock:
                |  embedTag: " \n\\t "
-               |  embedMetadata: " \\x\n "
                |  embedContent: |
                |    
             """.trimMargin(),
@@ -392,7 +390,6 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
                 {
                   "embedBlock": {
                     "embedTag": " \n\\t ",
-                    "embedMetadata": " \\x\n ",
                     "embedContent": ""
                   }
                 }
@@ -409,65 +406,23 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
 
         assertParsesTo(
             """
-               embedBlock: %colons\:in\\\:tag: quotes ' in metadata
+               embedBlock: %colons:in\\:tag: quotes ' in metadata
                   %%
             """.trimIndent(),
             """
-                embedBlock: %colons\:in\\\:tag: quotes ' in metadata
+                embedBlock: %colons:in\\:tag: quotes ' in metadata
                   %%
             """.trimIndent(),
             """
                |embedBlock:
-               |  embedTag: "colons:in\\:tag"
-               |  embedMetadata: "quotes ' in metadata"
+               |  embedTag: "colons:in\\:tag: quotes ' in metadata"
                |  embedContent: |
                |    
             """.trimMargin(),
             """
                 {
                   "embedBlock": {
-                    "embedTag": "colons:in\\:tag",
-                    "embedMetadata": "quotes ' in metadata",
-                    "embedContent": ""
-                  }
-                }
-            """.trimIndent(), compileSettings = compileSettings
-        )
-    }
-
-    @Test
-    fun testEmbedBlockPreambleFromObjectWithTrickyChars() {
-        val compileSettings = KsonCoreTest.CompileSettings(
-            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
-            jsonSettings = Json(retainEmbedTags = true)
-        )
-
-        assertParsesTo(
-            """
-               {
-                  "embedBlock": {
-                    "embedTag": "colons:in\\:tag",
-                    "embedMetadata": "quotes ' in metadata",
-                    "embedContent": ""
-                  }
-                }
-            """.trimIndent(),
-            """
-                embedBlock: %colons\:in\\\:tag: quotes ' in metadata
-                  %%
-            """.trimIndent(),
-            """
-               |embedBlock:
-               |  embedTag: "colons:in\\:tag"
-               |  embedMetadata: "quotes ' in metadata"
-               |  embedContent: |
-               |    
-            """.trimMargin(),
-            """
-                {
-                  "embedBlock": {
-                    "embedTag": "colons:in\\:tag",
-                    "embedMetadata": "quotes ' in metadata",
+                    "embedTag": "colons:in\\:tag: quotes ' in metadata",
                     "embedContent": ""
                   }
                 }
@@ -488,20 +443,17 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
                   "embedBlock": {
                     "embedTag": "embedTag
                raw newline",
-                    "embedMetadata": "metadata
-               raw newline",
                     "embedContent": ""
                   }
                 }
             """.trimIndent(),
             """
-                embedBlock: %embedTag\nraw newline: metadata\nraw newline
+                embedBlock: %embedTag\nraw newline
                   %%
             """.trimIndent(),
             """
                |embedBlock:
                |  embedTag: "embedTag\nraw newline"
-               |  embedMetadata: "metadata\nraw newline"
                |  embedContent: |
                |    
             """.trimMargin(),
@@ -509,7 +461,6 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
                 {
                   "embedBlock": {
                     "embedTag": "embedTag\nraw newline",
-                    "embedMetadata": "metadata\nraw newline",
                     "embedContent": ""
                   }
                 }

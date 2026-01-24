@@ -571,7 +571,7 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
         // consume the open quote
         builder.advanceLexer()
 
-        val contentParsed = stringContent(standardStringEndToken)
+        val contentParsed = stringContent(STRING_CLOSE_QUOTE)
 
         if (!contentParsed) {
             stringMark.rollbackTo()
@@ -595,18 +595,15 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
     /**
      * string_content -> (STRING_CONTENT | STRING_ILLEGAL_CONTROL_CHARACTER | STRING_UNICODE_ESCAPE | STRING_ESCAPE)*
      *
-     * @param closeQuoteTokenTypes the set of tokens delimit the end of this [stringContent]
-     * @param forEmbedTag we need to do a bit of special work around respecting : escapes in embed tags. This feels
-     *   like somewhat of a hack, being such a hyper-specific param this case, it is fairly isolated to this parse,
-     *   so we'll accept the hack (for now??)
+     * @param closeQuoteTokenType the type of token that denotes the end of this [stringContent]
      */
-    private fun stringContent(closeQuoteTokenTypes: Set<TokenType>, forEmbedTag: Boolean = false): Boolean {
-        if (closeQuoteTokenTypes.contains(builder.getTokenType())) {
+    private fun stringContent(closeQuoteTokenType: TokenType): Boolean {
+        if (builder.getTokenType() == closeQuoteTokenType) {
             // empty string!
             return true
         }
 
-        while (!closeQuoteTokenTypes.contains(builder.getTokenType()) && !builder.eof()) {
+        while (builder.getTokenType() != closeQuoteTokenType && !builder.eof()) {
             when (builder.getTokenType()) {
                 STRING_CONTENT -> builder.advanceLexer()
                 STRING_UNICODE_ESCAPE -> {
@@ -624,9 +621,7 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
                     val stringEscapeMark = builder.mark()
                     val stringEscapeText = builder.getTokenText()
                     builder.advanceLexer()
-                    if (isValidStringEscape(stringEscapeText)
-                        // if this string being parsed for an embedTag, then ':' may be escaped
-                        || (forEmbedTag && stringEscapeText == "\\:")) {
+                    if (isValidStringEscape(stringEscapeText)) {
                         stringEscapeMark.drop()
                     } else {
                         stringEscapeMark.error(STRING_BAD_ESCAPE.create(stringEscapeText))
@@ -673,20 +668,10 @@ class Parser(private val builder: AstBuilder, private val maxNestingLevel: Int =
             return
         }
 
-        if (builder.getTokenType() != EMBED_TAG_STOP) {
+        if (builder.getTokenType() != EMBED_PREAMBLE_NEWLINE) {
             val embedTagMark = builder.mark()
-            stringContent(embedTagEndTokens, true)
+            stringContent(EMBED_PREAMBLE_NEWLINE)
             embedTagMark.done(EMBED_TAG)
-        }
-            
-        // Check for optional meta tag
-        if (builder.getTokenType() == EMBED_TAG_STOP) {
-            // advance past our EMBED_TAG_STOP
-            builder.advanceLexer()
-
-            val metaTagMark = builder.mark()
-            stringContent(embedMetadataEndTokens)
-            metaTagMark.done(EMBED_METADATA)
         }
     }
 
@@ -844,7 +829,3 @@ private val validHexChars = setOf(
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'
 )
-
-private val standardStringEndToken = setOf(STRING_CLOSE_QUOTE)
-private val embedTagEndTokens = setOf(EMBED_TAG_STOP, EMBED_PREAMBLE_NEWLINE)
-private val embedMetadataEndTokens = setOf(EMBED_PREAMBLE_NEWLINE)

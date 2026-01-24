@@ -5,7 +5,6 @@ import org.kson.parser.ParsedElementType.*
 import org.kson.parser.TokenType.*
 import org.kson.parser.behavior.embedblock.EmbedDelim
 import org.kson.parser.behavior.StringQuote
-import org.kson.parser.behavior.StringQuote.EmbedTagQuote
 import org.kson.parser.behavior.embedblock.EmbedObjectKeys
 import org.kson.parser.messages.CoreParseMessage
 import org.kson.parser.messages.Message
@@ -213,14 +212,6 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
                             )
                         }
 
-                        val metadataNode = childMarkers.find { it.element == EMBED_METADATA }?.let{
-                            QuotedStringNode(
-                                StringQuote.SingleQuote.escapeQuotes(it.getValue()),
-                                StringQuote.SingleQuote,
-                                it.getLocation()
-                            )
-                        }
-
                         val embedContentNode = childMarkers.find { it.element == EMBED_CONTENT }?.let{
                             /**
                              * Ensure the embed_content is properly escaped so we can create a [QuotedStringNode]
@@ -237,7 +228,6 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
 
                         EmbedBlockNode(
                             embedTagNode,
-                            metadataNode,
                             embedContentNode,
                             EmbedDelim.fromString(embedDelimChar),
                             marker.getLocation())
@@ -402,21 +392,11 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
 
         val embedTagString = propertiesMap[EmbedObjectKeys.EMBED_TAG.key]
         val embedTagNode = embedTagString?.let {
-            val embedTagEscapedContent = EmbedTagQuote.escapeQuotes(it.stringContent)
-                // also ensure there are no raw newlines - raw newline would put us inside the embed content
+            val embedTagContent = it.stringContent
+                // ensure there are no raw newlines - raw newline would put us inside the embed content
                 .replace("\n", "\\n")
             QuotedStringNode(
-                StringQuote.SingleQuote.escapeQuotes(embedTagEscapedContent),
-                StringQuote.SingleQuote,
-                it.location
-            )
-        }
-
-        val embedMetadataString = propertiesMap[EmbedObjectKeys.EMBED_METADATA.key]
-        val embedMetadataNode = embedMetadataString?.let {
-            val embedMetaEscapedContent = it.stringContent.replace("\n", "\\n")
-            QuotedStringNode(
-                StringQuote.SingleQuote.escapeQuotes(embedMetaEscapedContent),
+                StringQuote.SingleQuote.escapeQuotes(embedTagContent),
                 StringQuote.SingleQuote,
                 it.location
             )
@@ -433,7 +413,6 @@ class KsonBuilder(private val tokens: List<Token>, private val ignoreErrors: Boo
 
         return EmbedBlockNode(
                 embedTagNode,
-                embedMetadataNode,
                 embedContentValue,
                 EmbedDelim.Percent,
                 location

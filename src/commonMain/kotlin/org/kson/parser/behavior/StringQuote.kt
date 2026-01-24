@@ -20,9 +20,6 @@ sealed class StringQuote(private val quoteChar: Char) {
     /** Double-quote delimiter ("), our "alternate" delimiter */
     object DoubleQuote : StringQuote('"')
 
-    /** The embed-tag delimiter (:), used to denote the end of an embed-tag */
-    object EmbedTagQuote : StringQuote(':')
-
     /**
      * Counts the number of occurrences of this [quoteChar] in the given [rawContent]
      */

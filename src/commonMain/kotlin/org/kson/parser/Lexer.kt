@@ -364,7 +364,7 @@ class Lexer(source: String, gapFree: Boolean = false) {
             ',' -> addLiteralToken(COMMA)
             '"', '\'' -> {
                 addLiteralToken(STRING_OPEN_QUOTE)
-                quotedString({ it.peek() != char })
+                quotedString(char)
                 if (sourceScanner.eof()) {
                     return
                 } else {
@@ -437,13 +437,11 @@ class Lexer(source: String, gapFree: Boolean = false) {
     /**
      * Lexes a quoted string. NOTE: callers are responsibly for lexing their opening and closing quotes.
      *
-     * @param stillInStringPredicate a lamba which returns true if the given [SourceScanner] is still in the quoted
-     *   string, and false otherwise. Usually checking for whatever the caller considers a close quote, but is more
-     *   involved for our custom embed tag and metadata syntax
+     * @param delimiter the delimiter [Char] which closes this quoted string
      */
-    private fun quotedString(stillInStringPredicate: (SourceScanner) -> Boolean) {
+    private fun quotedString(delimiter: Char) {
         var hasUntokenizedStringCharacters = false
-        while (stillInStringPredicate(sourceScanner)) {
+        while (sourceScanner.peek() != delimiter) {
             val nextStringChar = sourceScanner.peek() ?: break
 
             // check for illegal control characters
@@ -472,7 +470,7 @@ class Lexer(source: String, gapFree: Boolean = false) {
 
                     // a '\u' unicode escape must be 4 chars long
                     for (c in 1..4) {
-                        if (!stillInStringPredicate(sourceScanner) || sourceScanner.eof()) {
+                        if (sourceScanner.peek() == delimiter || sourceScanner.eof()) {
                             break
                         }
                         sourceScanner.advance()
@@ -513,25 +511,9 @@ class Lexer(source: String, gapFree: Boolean = false) {
         } else if (sourceScanner.eof()) {
             return
         } else {
-            /**
-             * Our source scanner is still in the embed preamble so long as this condition holds
-             */
-            val stillInEmbedPreamble:(delimChar: Char) -> Boolean = {
-                !sourceScanner.eof()
-                        && !(sourceScanner.peek() == delimChar && sourceScanner.peekNext() == delimChar)
-                        && sourceScanner.peek() != '\n'
-            }
-
-            // we have an embed tag, let's scan it
-            quotedString({ stillInEmbedPreamble(delimChar) && it.peek() != ':' })
-
-            if(sourceScanner.peek() == ':') {
-                sourceScanner.advance()
-                addLiteralToken(EMBED_TAG_STOP)
-
-                // scan any metadata given in the preamble
-                quotedString { stillInEmbedPreamble(delimChar) }
-            }
+            // we have an embed tag, let's scan it: it's a "quoted string" with no quotes
+            // that runs until the first raw newline
+            quotedString('\n')
 
             // lex this premature embed end
             if (sourceScanner.peek() == delimChar && sourceScanner.peekNext() == delimChar) {
