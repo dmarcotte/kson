@@ -863,7 +863,7 @@ class EmbedBlockNode(
 ) :
     KsonValueNodeImpl(sourceTokens) {
 
-    private val embedTag: String = embedTagNode?.delimiterUnescapedRawContent ?: ""
+    private val embedTag: String? = embedTagNode?.delimiterUnescapedRawContent
     private val embedContent: String = embedContentNode.processedStringContent
 
     override fun toSourceInternal(indent: Indent, nextNode: AstNode?, compileTarget: CompileTarget): String {
@@ -956,7 +956,7 @@ class EmbedBlockNode(
      * @return The rendered JSON object string
      */
     private fun renderJsonObject(indent: Indent, nextIndent: Indent): String {
-        val embedTagLine = if (embedTag.isNotEmpty()) {
+        val embedTagLine = if (embedTag != null) {
             "${nextIndent.bodyLinesIndent()}\"${EmbedObjectKeys.EMBED_TAG.key}\": \"${DoubleQuote.escapeQuotes(embedTag)}\",\n"
         } else ""
 
@@ -974,7 +974,7 @@ class EmbedBlockNode(
      * @return The rendered YAML object string
      */
     private fun renderYamlObject(indent: Indent): String {
-        val embedTagLine = if (embedTag.isNotEmpty()) {
+        val embedTagLine = if (embedTag != null) {
             "${indent.firstLineIndent()}${EmbedObjectKeys.EMBED_TAG.key}: \"${DoubleQuote.escapeQuotes(embedTag)}\"\n"
         } else ""
 

@@ -636,6 +636,43 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
     }
 
     @Test
+    fun testEmbedBlockFromObjectWithEmptyTag() {
+        val compileSettings = KsonCoreTest.CompileSettings(
+            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
+            jsonSettings = Json(retainEmbedTags = true)
+        )
+
+        // Issue 1: An empty embedTag ("") should round-trip through embed block form without being lost.
+        // Currently, renderJsonObject/renderYamlObject omit the tag when embedTag.isEmpty(),
+        // so round-tripping {embedTag: "", embedContent: "c"} drops the embedTag property entirely.
+        assertParsesTo(
+            """
+               embedBlock:
+                 "embedTag": ""
+                 "embedContent": "content"
+            """.trimIndent(),
+            """
+                embedBlock: %
+                  content%%
+            """.trimIndent(),
+            """
+                embedBlock:
+                  embedTag: ""
+                  embedContent: |
+                    content
+            """.trimIndent(),
+            """
+                {
+                  "embedBlock": {
+                    "embedTag": "",
+                    "embedContent": "content"
+                  }
+                }
+            """.trimIndent(), compileSettings = compileSettings
+        )
+    }
+
+    @Test
     fun testEmbeddedEmbedBlockFromObject(){
         val compileSettings = KsonCoreTest.CompileSettings(
             yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
