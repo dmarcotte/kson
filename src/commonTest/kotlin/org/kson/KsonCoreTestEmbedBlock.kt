@@ -673,6 +673,39 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
     }
 
     @Test
+    fun testEmbedBlockFromObjectWithLiteralNewlineInTag() {
+        val compileSettings = KsonCoreTest.CompileSettings(
+            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
+            jsonSettings = Json(retainEmbedTags = true)
+        )
+
+        assertParsesTo(
+            """
+                embedBlock:
+                  embedTag: "line1
+                line2"
+                  embedContent: content""".trimIndent(),
+            """
+                embedBlock: %line1\nline2
+                  content%%""".trimIndent(),
+            """
+                embedBlock:
+                  embedTag: "line1\nline2"
+                  embedContent: |
+                    content
+            """.trimIndent(),
+            """
+                {
+                  "embedBlock": {
+                    "embedTag": "line1\nline2",
+                    "embedContent": "content"
+                  }
+                }
+            """.trimIndent(), compileSettings = compileSettings
+        )
+    }
+
+    @Test
     fun testEmbeddedEmbedBlockFromObject(){
         val compileSettings = KsonCoreTest.CompileSettings(
             yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
