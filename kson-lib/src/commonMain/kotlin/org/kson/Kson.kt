@@ -4,7 +4,7 @@
 package org.kson
 
 import org.kson.Kson.parseSchema
-import org.kson.Kson.publishMessages
+import org.kson.ast.AstNode
 import org.kson.parser.*
 import org.kson.parser.messages.MessageSeverity as InternalMessageSeverity
 import org.kson.schema.JsonSchema
@@ -29,8 +29,11 @@ import kotlin.js.JsExport
 
 /**
  * The [Kson](https://kson.org) language
+ *
+ * This object is the public API for KSON operations and the in-process implementation of [KsonService]
  */
-object Kson {
+object Kson : KsonService {
+
     /**
      * Formats Kson source with the specified formatting options.
      *
@@ -38,7 +41,7 @@ object Kson {
      * @param formatOptions The formatting options to apply
      * @return The formatted Kson source
      */
-    fun format(kson: String, formatOptions: FormatOptions = FormatOptions()): String {
+    override fun format(kson: String, formatOptions: FormatOptions): String {
         return org.kson.tools.format(kson, formatOptions.toInternal())
     }
 
@@ -49,10 +52,8 @@ object Kson {
      * @param options Options for the JSON transpilation
      * @return A Result containing either the Json output or error messages
      */
-    fun toJson(kson: String, options: TranspileOptions.Json = TranspileOptions.Json()): Result {
-        val compileConfig = Json(
-            retainEmbedTags = options.retainEmbedTags,
-        )
+    override fun toJson(kson: String, options: TranspileOptions.Json): Result {
+        val compileConfig = Json(retainEmbedTags = options.retainEmbedTags)
         val jsonParseResult = KsonCore.parseToJson(kson, compileConfig)
         return if (jsonParseResult.hasErrors()) {
             Result.Failure(publishMessages(jsonParseResult.messages))
@@ -68,16 +69,46 @@ object Kson {
      * @param options Options for the YAML transpilation
      * @return A Result containing either the Yaml output or error messages
      */
-    fun toYaml(kson: String, options: TranspileOptions.Yaml = TranspileOptions.Yaml()): Result {
-        val compileConfig = CompileTarget.Yaml(
-            retainEmbedTags = options.retainEmbedTags,
-        )
+    override fun toYaml(kson: String, options: TranspileOptions.Yaml): Result {
+        val compileConfig = CompileTarget.Yaml(retainEmbedTags = options.retainEmbedTags)
         val yamlParseResult = KsonCore.parseToYaml(kson, compileConfig)
         return if (yamlParseResult.hasErrors()) {
             Result.Failure(publishMessages(yamlParseResult.messages))
         } else {
             Result.Success(yamlParseResult.yaml!!)
         }
+    }
+
+    override fun parse(kson: String, schema: String, outputFormat: OutputFormat?, retainEmbedTags: Boolean, filepath: String?): ParseResult {
+        val schemaParseResult = KsonCore.parseSchema(schema)
+        val schemaMessages = publishMessages(schemaParseResult.messages)
+        val jsonSchema = schemaParseResult.jsonSchema
+        if (jsonSchema == null || schemaMessages.isNotEmpty()) {
+            return ParseResult.Failure(schemaMessages)
+        }
+
+        val sourceContext = SourceContext(filepath)
+        val astParseResult = KsonCore.parseToAst(
+            kson,
+            CoreCompileConfig(sourceContext = sourceContext)
+        )
+        if (astParseResult.hasErrors()) {
+            return ParseResult.Failure(publishMessages(astParseResult.messages))
+        }
+
+        val messageSink = MessageSink()
+        val ksonValue = astParseResult.ksonValue
+        if (ksonValue != null) {
+            jsonSchema.validate(ksonValue, messageSink, sourceContext)
+        }
+
+        val output = when (outputFormat) {
+            OutputFormat.JSON -> astParseResult.toSourceOrNull(AstNode.Indent(), Json(retainEmbedTags = retainEmbedTags))
+            OutputFormat.YAML -> astParseResult.toSourceOrNull(AstNode.Indent(), CompileTarget.Yaml(retainEmbedTags = retainEmbedTags))
+            null -> null
+        }
+
+        return ParseResult.Success(publishMessages(messageSink.loggedMessages()), output)
     }
 
     /**
@@ -116,23 +147,24 @@ object Kson {
         return SchemaResult.Success(SchemaValidator(jsonSchema))
     }
 
-    /**
-     * "Publish" our internal [LoggedMessage]s to list of public-facing [Message] objects
-     */
-    internal fun publishMessages(loggedMessages: List<LoggedMessage>): List<Message> {
-        return loggedMessages.map {
-            val severity = when(it.message.type.severity) {
-                InternalMessageSeverity.ERROR -> MessageSeverity.ERROR
-                InternalMessageSeverity.WARNING -> MessageSeverity.WARNING
-            }
+}
 
-            Message(
-                message = it.message.toString(),
-                severity = severity,
-                start = Position(it.location.start),
-                end = Position(it.location.end)
-            )
+/**
+ * Convert internal [LoggedMessage]s to public-facing [Message] objects.
+ */
+internal fun publishMessages(loggedMessages: List<LoggedMessage>): List<Message> {
+    return loggedMessages.map {
+        val severity = when(it.message.type.severity) {
+            InternalMessageSeverity.ERROR -> MessageSeverity.ERROR
+            InternalMessageSeverity.WARNING -> MessageSeverity.WARNING
         }
+
+        Message(
+            message = it.message.toString(),
+            severity = severity,
+            start = Position(it.location.start),
+            end = Position(it.location.end)
+        )
     }
 }
 
@@ -143,6 +175,24 @@ object Kson {
 sealed class Result {
     class Success(val output: String) : Result()
     class Failure(val errors: List<Message>) : Result()
+}
+
+/**
+ * The output format for optional transpilation in [KsonService.parse].
+ */
+enum class OutputFormat { JSON, YAML }
+
+/**
+ * Result of a [KsonService.parse] operation.
+ *
+ * [Success] means parsing and validation completed (the messages list contains any
+ * schema findings, or is empty if the document conforms). If an [OutputFormat] was
+ * requested, [Success.output] contains the rendered output. [Failure] means the
+ * operation could not complete --- the schema or source could not be parsed.
+ */
+sealed class ParseResult {
+    class Success(val messages: List<Message>, val output: String? = null) : ParseResult()
+    class Failure(val errors: List<Message>) : ParseResult()
 }
 
 /**

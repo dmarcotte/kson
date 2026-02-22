@@ -1,0 +1,292 @@
+# KSON Service Protocol Schema
+#
+# This schema defines the request and response format for the KSON
+# service document protocol. A KSON service accepts requests describing
+# operations to perform on KSON source, and returns responses with results.
+#
+# Source content is carried as strings or as embed blocks. When using
+# embed blocks, the embed block object isomorphism applies: a %kson
+# embed block is equivalent to { embedTag: "kson", embedContent: "..." }.
+
+{
+  '$schema': 'http://json-schema.org/draft-07/schema#'
+  title: 'KSON Service Protocol'
+  description: 'A KSON service protocol message is either a request or a response'
+  oneOf: [
+    { '$ref': '#/definitions/request' }
+    { '$ref': '#/definitions/response' }
+  ]
+
+  definitions: {
+
+    request: {
+      title: Request
+      description: 'A request to perform an operation on KSON source'
+      oneOf: [
+        { '$ref': '#/definitions/formatRequest' }
+        { '$ref': '#/definitions/toJsonRequest' }
+        { '$ref': '#/definitions/toYamlRequest' }
+        { '$ref': '#/definitions/parseRequest' }
+      ]
+    }
+
+    formatRequest: {
+      title: 'Format Request'
+      description: 'Format KSON source with specified formatting options'
+      type: object
+      properties: {
+        operation: { const: format }
+        source: { '$ref': '#/definitions/ksonSource' }
+        options: { '$ref': '#/definitions/formatOptions' }
+      }
+      required: [ operation, source ]
+      additionalProperties: false
+    }
+
+    toJsonRequest: {
+      title: 'Convert to JSON Request'
+      description: 'Convert KSON source to JSON'
+      type: object
+      properties: {
+        operation: { const: toJson }
+        source: { '$ref': '#/definitions/ksonSource' }
+        options: { '$ref': '#/definitions/transpileOptions' }
+      }
+      required: [ operation, source ]
+      additionalProperties: false
+    }
+
+    toYamlRequest: {
+      title: 'Convert to YAML Request'
+      description: 'Convert KSON source to YAML'
+      type: object
+      properties: {
+        operation: { const: toYaml }
+        source: { '$ref': '#/definitions/ksonSource' }
+        options: { '$ref': '#/definitions/transpileOptions' }
+      }
+      required: [ operation, source ]
+      additionalProperties: false
+    }
+
+    parseRequest: {
+      title: 'Parse Request'
+      description: 'Parse KSON source and validate against a JSON Schema, optionally producing output'
+      type: object
+      properties: {
+        operation: { const: parse }
+        source: { '$ref': '#/definitions/ksonSource' }
+        schema: { '$ref': '#/definitions/ksonSource' }
+        outputFormat: {
+          type: string
+          description: 'If specified, the parsed kson is also rendered to this format'
+          enum: [ json, yaml ]
+        }
+        options: { '$ref': '#/definitions/transpileOptions' }
+        filepath: {
+          type: string
+          description: 'Optional filepath context for the document being validated'
+        }
+      }
+      required: [ operation, source, schema ]
+      additionalProperties: false
+    }
+
+    ksonSource: {
+      title: 'KSON Source'
+      description: 'KSON content as a string or a %kson embed block'
+      oneOf: [
+        { type: string }
+        {
+          type: object
+          description: 'A %kson embed block (embed block object isomorphism)'
+          properties: {
+            embedTag: { const: kson }
+            embedContent: { type: string }
+          }
+          required: [ embedTag, embedContent ]
+          additionalProperties: false
+        }
+      ]
+    }
+
+    outputContent: {
+      title: 'Output Content'
+      description: 'Operation output as a string or an embed block'
+      oneOf: [
+        { type: string }
+        {
+          type: object
+          description: 'An embed block (embed block object isomorphism)'
+          properties: {
+            embedTag: { type: string }
+            embedContent: { type: string }
+          }
+          required: [ embedContent ]
+          additionalProperties: false
+        }
+      ]
+    }
+
+    formatOptions: {
+      title: 'Format Options'
+      description: 'Options controlling how KSON is formatted'
+      type: object
+      properties: {
+        indentSize: {
+          type: integer
+          description: 'Spaces per indent level (used when indentType is "spaces")'
+          minimum: 1
+          default: 2
+        }
+        indentType: {
+          type: string
+          description: 'Indentation character type'
+          enum: [ spaces, tabs ]
+          default: spaces
+        }
+        formattingStyle: {
+          type: string
+          description: 'Output formatting style'
+          enum: [ plain, delimited, compact, classic ]
+          default: plain
+        }
+        embedBlockRules: {
+          type: array
+          description: 'Rules for rendering paths as embed blocks'
+          items: { '$ref': '#/definitions/embedBlockRule' }
+        }
+      }
+      additionalProperties: false
+    }
+
+    transpileOptions: {
+      title: 'Transpile Options'
+      description: 'Options controlling KSON transpilation'
+      type: object
+      properties: {
+        retainEmbedTags: {
+          type: boolean
+          description: 'Retain embed tag/content structure in output'
+          default: true
+        }
+      }
+      additionalProperties: false
+    }
+
+    embedBlockRule: {
+      title: 'Embed Block Rule'
+      description: 'Rule for rendering strings at matching paths as embed blocks'
+      type: object
+      properties: {
+        pathPattern: {
+          type: string
+          description: 'JsonPointerGlob pattern (e.g. "/scripts/*")'
+        }
+        tag: {
+          type: string
+          description: 'Embed tag (e.g. "yaml", "sql", "bash")'
+        }
+      }
+      required: [ pathPattern ]
+      additionalProperties: false
+    }
+
+    response: {
+      title: Response
+      description: 'A response from the KSON service'
+      oneOf: [
+        { '$ref': '#/definitions/successResponse' }
+        { '$ref': '#/definitions/parseResponse' }
+        { '$ref': '#/definitions/failureResponse' }
+      ]
+    }
+
+    successResponse: {
+      title: 'Success Response'
+      description: 'Successful format or transpile result containing output'
+      type: object
+      properties: {
+        status: { const: success }
+        output: { '$ref': '#/definitions/outputContent' }
+      }
+      required: [ status, output ]
+      additionalProperties: false
+    }
+
+    parseResponse: {
+      title: 'Parse Response'
+      description: 'Result of a parse operation, with validation messages and optional output'
+      type: object
+      properties: {
+        status: { const: success }
+        messages: {
+          type: array
+          description: 'Validation messages (empty array if document is valid)'
+          items: { '$ref': '#/definitions/message' }
+        }
+        output: { '$ref': '#/definitions/outputContent' }
+      }
+      required: [ status, messages ]
+      additionalProperties: false
+    }
+
+    failureResponse: {
+      title: 'Failure Response'
+      description: 'Operation failed due to parse errors or invalid request'
+      type: object
+      properties: {
+        status: { const: failure }
+        messages: {
+          type: array
+          description: 'Error messages describing the failure'
+          items: { '$ref': '#/definitions/message' }
+          minItems: 1
+        }
+      }
+      required: [ status, messages ]
+      additionalProperties: false
+    }
+
+    message: {
+      title: Message
+      description: 'A message generated during KSON processing'
+      type: object
+      properties: {
+        message: {
+          type: string
+          description: 'Human-readable message text'
+        }
+        severity: {
+          type: string
+          description: 'Message severity level'
+          enum: [ error, warning ]
+        }
+        start: { '$ref': '#/definitions/position' }
+        end: { '$ref': '#/definitions/position' }
+      }
+      required: [ message, severity, start, end ]
+      additionalProperties: false
+    }
+
+    position: {
+      title: Position
+      description: 'Zero-based line/column position in source'
+      type: object
+      properties: {
+        line: {
+          type: integer
+          description: 'Line number (0-based)'
+          minimum: 0
+        }
+        column: {
+          type: integer
+          description: 'Column number (0-based)'
+          minimum: 0
+        }
+      }
+      required: [ line, column ]
+      additionalProperties: false
+    }
+  }
+}
