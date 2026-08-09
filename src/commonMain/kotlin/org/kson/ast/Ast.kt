@@ -245,7 +245,33 @@ private fun isTrailingContent(nextNode: AstNode?): Boolean {
     return nextNode is KsonValueNode
 }
 
-class ObjectNode(val properties: List<ObjectPropertyNode>, sourceTokens: List<Token>) : KsonValueNodeImpl(sourceTokens) {
+/**
+ * How an [ObjectNode] or [ListNode] "container" marked its bounds in the source it was parsed from.
+ * Note that the parsed value alone cannot answer this: `key: value` and `{key: value}` describe the
+ * exact same value, so [BoundaryStyle] gets recorded into AST nodes as the tree is built.
+ *
+ * Note also this describes the source we read, not the [org.kson.tools.FormattingStyle] we may write
+ * back out: an object parsed as [PLAIN] is free to be formatted as [DELIMITED] and vice versa.
+ */
+enum class BoundaryStyle {
+    /**
+     * Bounds are initiated by an opening property/element, and closed by
+     * either running out of properties/elements or being explicitly terminated
+     * by an end-dot `.` or an end-dash `=`
+     */
+    PLAIN,
+
+    /**
+     * Bounds are spelled out by a delimiter pair: `{}` for objects, `<>` or `[]` for lists
+     */
+    DELIMITED
+}
+
+class ObjectNode(
+    val properties: List<ObjectPropertyNode>,
+    val style: BoundaryStyle,
+    sourceTokens: List<Token>
+) : KsonValueNodeImpl(sourceTokens) {
     override fun toSourceInternal(indent: Indent, nextNode: AstNode?, compileTarget: CompileTarget): String {
         if (properties.isEmpty()) {
             return "${indent.firstLineIndent()}{}"
@@ -445,6 +471,7 @@ class ObjectPropertyNodeImpl(
 
 class ListNode(
     val elements: List<ListElementNode>,
+    val style: BoundaryStyle,
     sourceTokens: List<Token>
 ) : KsonValueNodeImpl(sourceTokens) {
     private sealed class ListDelimiters(val open: Char, val close: Char) {
