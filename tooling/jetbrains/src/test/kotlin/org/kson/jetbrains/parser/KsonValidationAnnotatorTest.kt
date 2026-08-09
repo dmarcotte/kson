@@ -75,26 +75,27 @@ class KsonValidationAnnotatorTest : BasePlatformTestCase() {
     }
 
     fun testWarningsAreMarkedAsWarnings() {
-        // Test that warnings like ignored end-dots are properly marked
+        // a deceptive indent inside delimiters is a warning: the delimiters describe the structure
+        // whatever the indentation does
         val source = """
-            - list_item
-                - deceptive_indent_list_item
+            <- list_item
+                 - deceptive_indent_list_item>
         """.trimIndent()
         myFixture.configureByText(KsonFileType, source) as KsonPsiFile
-        
+
         val highlights = myFixture.doHighlighting()
-        
+
         assertTrue("Should have at least one highlight for the warning", highlights.isNotEmpty())
-        
+
         // Check that we have a warning-level highlight
         val listDashWarning = highlights.filter {
-            it.severity.myVal == com.intellij.lang.annotation.HighlightSeverity.WARNING.myVal 
+            it.severity.myVal == com.intellij.lang.annotation.HighlightSeverity.WARNING.myVal
         }.find {
-            val listDashMessage = MessageType.DASH_LIST_ITEMS_MISALIGNED.create().toString()
+            val listDashMessage = MessageType.DELIMITED_LIST_ELEMENTS_MISALIGNED.create().toString()
             it.description == listDashMessage
         }
 
-        assertNotNull("Should have a warning about ignored end-dot", listDashWarning)
+        assertNotNull("Should have a warning about the deceptive indent", listDashWarning)
         
         // Ensure there are no errors for this valid (but warned) syntax
         val errorHighlights = highlights.filter { 
@@ -107,7 +108,8 @@ class KsonValidationAnnotatorTest : BasePlatformTestCase() {
         // Test a case with both warnings and errors
         val source = """
             - {key:}
-                - deceptive_indent_list_item
+            - <- list_item
+                 - deceptive_indent_list_item>
         """.trimIndent()
         myFixture.configureByText(KsonFileType, source) as KsonPsiFile
         
