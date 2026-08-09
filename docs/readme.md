@@ -297,6 +297,42 @@ favorite_movie: 'The Rock'
 
 Explicitly closing a plain object or list is always legal, even when not required. The formatter cleans up unneeded end-dots and end-dashes.
 
+## Deceptive Indentation
+
+Indentation never determines structure in KSON.  As described [above](#how-plain-structures-end), the parse is fully decided by keys, dashes, delimiters and terminators. However, indentation is valuable because readers mentally parse indentation into structure.  So, in addition to the built-in formatter, KSON insists that the mental parse matches the truth: indentation which misrepresents a document's actual nesting is **deceptive**, and in plain structures it is an error.
+
+```kson
+teams:
+  - name: 'Team A'
+    members:
+      - Alice
+      - Bob
+  - name: 'Team B'
+# ERROR: the "- name: 'Team B'" element is deceptively indented
+```
+
+This document reads as two teams, but KSON's greedy parse rules mean nothing ended the `members` list, so `- name: 'Team B'` is its third element. Rather than quietly deliver one team where the document pictures two, KSON rejects the document. The fix is to correct whichever half is lying&mdash;here, an [end-dash `=`](#the-end-dash-) makes the structure match the picture:
+
+```kson
+teams:
+  - name: 'Team A'
+    members:
+      - Alice
+      - Bob
+      =
+  - name: 'Team B'
+```
+
+This is each language's deal with its reader:
+
+- **JSON**: delimiters carry the structure; indentation is decoration, free to mislead
+- **YAML**: indentation *is* the structure; errors when it cannot be parsed
+- **KSON plain structures**: dashes, keys and terminators carry the structure; errors when the indentation cannot be trusted
+
+The result is YAML's clean look with JSON's rigor: you maintain the data, [the formatter](#formatting-styles) maintains the indentation, and&mdash;because the parser itself enforces the deal&mdash;a plain KSON document that parses is a document that means what it looks like it means.
+
+In [delimited structures](#delimited-objects), the delimiters own the structure exactly as in JSON, so the same misleading indentation is merely untidy: KSON flags it as a warning for the formatter to clean up.
+
 ## Embed Blocks
 
 The KSON Embed Block is designed for ergonomically embedding complex content such as code blocks. See [Embed Block JSON Compatibility](#embed-block-json-compatibility) for details on how the KSON/JSON equivalence is handled for Embed Blocks

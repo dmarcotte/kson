@@ -1,63 +1,102 @@
 package org.kson.validation
 
 import org.kson.ast.*
+import org.kson.ast.BoundaryStyle.DELIMITED
+import org.kson.ast.BoundaryStyle.PLAIN
 import org.kson.parser.MessageSink
 import org.kson.parser.messages.MessageType
 import org.kson.parser.messages.MessageType.*
 
 /**
- * Validates that objects and lists do not have deceptive indentation, i.e. indentation that visually implies
- * incorrect list/object nesting
+ * [IndentValidator] ensures that the visual structure of a KSON document does not mislead readers about the _actual_
+ * structure of the data that document encodes.
  *
- * NOTE: we only validate the alignment of the "leading" indent of entries to avoid deceptive indentation.
- * Items which do not start a line, i.e. do not have an indent, are considered okay
+ * This contract is what lets KSON's plain syntax carry YAML's clean look with JSON's rigor: the user maintains
+ * the data, the auto-formatter maintains the indentation. YAML errors when indentation cannot be parsed,
+ * KSON notes when it cannot be _trusted_. Deceptive indentation/nesting is an ERROR in "plain" objects
+ * and lists, and a warning in delimited objects and lists: plain syntax gives a reader nothing but the indentation
+ * to go on, while `{}`, `<>` and `[]` describe the structure whatever the indentation does, leaving the same indent
+ * merely untidy.
+ *
+ * We focus validation of the alignment of entries which actually have an indent, i.e. entries starting a line.
+ * These are the elements that create the visual nesting or unnesting that can deceive a reader.
+ * Items which do not start a line cannot imply nesting or unnesting, so while they _may_ make structure less
+ * clear in some situations, that is not actively deceptive and so not flagged
  */
 class IndentValidator {
+    private val objectPropertiesMisaligned = DeceptiveIndentMessage(
+        PLAIN_OBJECT_PROPERTIES_MISALIGNED,
+        DELIMITED_OBJECT_PROPERTIES_MISALIGNED
+    )
+    private val listElementsMisaligned = DeceptiveIndentMessage(
+        PLAIN_LIST_ELEMENTS_MISALIGNED,
+        DELIMITED_LIST_ELEMENTS_MISALIGNED
+    )
+    private val objectPropertyNesting = DeceptiveIndentMessage(
+        PLAIN_OBJECT_PROPERTY_NESTING_ISSUE,
+        DELIMITED_OBJECT_PROPERTY_NESTING_ISSUE
+    )
+    private val listElementNesting = DeceptiveIndentMessage(
+        PLAIN_LIST_ELEMENT_NESTING_ISSUE,
+        DELIMITED_LIST_ELEMENT_NESTING_ISSUE
+    )
+
     fun validate(ast: KsonRoot, messageSink: MessageSink) {
         if (ast is KsonRootImpl) {
-            validateNodeAlignment(ast.rootNode, messageSink)
-            validateNodeNesting(ast.rootNode, 0,
-                // Note: this message type is unused for root (minNestingColumn: 0 means all nesting is legal)
-                OBJECT_PROPERTY_NESTING_ISSUE,
-                messageSink)
+            val rootNode = ast.rootNode
+            validateNodeAlignment(rootNode, messageSink)
+            // A document's root value may be indented however it likes, so nesting validation starts inside it,
+            // with a minimum nesting column of 0 leaving the root's own entries free to sit at any column
+            when (rootNode) {
+                is ObjectNode -> validateObjectNodeNesting(
+                    rootNode, 0, objectPropertyNesting.messageFor(rootNode.style), messageSink
+                )
+                is ListNode -> validateListNodeNesting(
+                    rootNode, 0, listElementNesting.messageFor(rootNode.style), messageSink
+                )
+                else -> {
+                    // a root that is neither an object nor a list has nothing nested inside it
+                }
+            }
         }
     }
 
     /**
-     * Validate that [node] is indented to at least position [minNestingColumn], logging [messageType] when this is
-     * violated.  We pass [messageType] here so that the message can be parent-aware (i.e. if we're improperly nested
-     * in an object, we can have an object-specific message.  Similar for a list.)
+     * Validate that [node] is indented to at least position [minNestingColumn], logging [nestingMessage] when this
+     * is violated.
+     *
+     * [nestingMessage] arrives already resolved to a [MessageType] because only the caller knows the container
+     * this nesting requirement comes from, and that container decides both halves of what we report: whether the
+     * message speaks of an object or a list, and---via its [BoundaryStyle]---how severely we say it.
      */
     private fun validateNodeNesting(node: KsonValueNode,
                                     minNestingColumn: Int,
-                                    messageType: MessageType,
+                                    nestingMessage: MessageType,
                                     messageSink: MessageSink) {
         when (node) {
-            is ObjectNode -> validateObjectNodeNesting(node, minNestingColumn, messageType, messageSink)
-            is ListNode -> validateListNodeNesting(node, minNestingColumn, messageType, messageSink)
+            is ObjectNode -> validateObjectNodeNesting(node, minNestingColumn, nestingMessage, messageSink)
+            is ListNode -> validateListNodeNesting(node, minNestingColumn, nestingMessage, messageSink)
             is EmbedBlockNode, is UnquotedStringNode, is QuotedStringNode,
             is NumberNode, is TrueNode, is FalseNode, is NullNode,
-            is KsonValueNodeError -> {
-                if (node.location.start.column < minNestingColumn) {
-                    messageSink.error(node.location.trimToFirstLine(), messageType.create())
-                }
-            }
+            is KsonValueNodeError -> reportIfUnderNested(node, minNestingColumn, nestingMessage, messageSink)
         }
     }
 
     private fun validateObjectNodeNesting(
         node: ObjectNode,
         minNestingColumn: Int,
-        messageType: MessageType,
+        nestingMessage: MessageType,
         messageSink: MessageSink,
     ) {
+        ensureSufficientIndent(node, node.properties, node.style, minNestingColumn, nestingMessage, messageSink)
+
         node.properties.forEach { property ->
-            if (property.location.start.column < minNestingColumn) {
-                messageSink.error(property.location.trimToFirstLine(), messageType.create())
-            }
             if (property is ObjectPropertyNodeImpl) {
+                /**
+                 * This requirement comes from [node]: a property's value must sit deeper than the key it hangs off
+                 */
                 validateNodeNesting(property.value, property.key.location.start.column + 1,
-                    OBJECT_PROPERTY_NESTING_ISSUE, messageSink)
+                    objectPropertyNesting.messageFor(node.style), messageSink)
             }
         }
     }
@@ -65,13 +104,12 @@ class IndentValidator {
     private fun validateListNodeNesting(
         node: ListNode,
         minNestingColumn: Int,
-        messageType: MessageType,
+        nestingMessage: MessageType,
         messageSink: MessageSink,
     ) {
+        ensureSufficientIndent(node, node.elements, node.style, minNestingColumn, nestingMessage, messageSink)
+
         node.elements.forEach { element ->
-            if (element.location.start.column < minNestingColumn) {
-                messageSink.error(element.location.trimToFirstLine(), messageType.create())
-            }
             if (element is ListElementNodeImpl) {
                 // an element with a dash has location offset before its value, so its value must sit one column deeper
                 val minListNestingColumn = if (element.location.startOffset < element.value.location.startOffset) {
@@ -79,10 +117,50 @@ class IndentValidator {
                 } else {
                     element.location.start.column
                 }
-                validateNodeNesting(element.value, minListNestingColumn, DASH_LIST_ITEMS_NESTING_ISSUE, messageSink)
+                /**
+                 * This requirement comes from [node]: an element's value must sit deeper than its dash
+                 */
+                validateNodeNesting(element.value, minListNestingColumn,
+                    listElementNesting.messageFor(node.style), messageSink)
             }
         }
     }
+
+    /**
+     * Ensures [node] is indented to at least [minNestingColumn], measuring it at whatever shows a reader
+     * where it sits, as determined by its [style]
+     *
+     * (Note: the slightly awkward args here allow us to handle both lists and objects for callers)
+     */
+    private fun ensureSufficientIndent(
+        node: KsonValueNode,
+        entries: List<AstNode>,
+        style: BoundaryStyle,
+        minNestingColumn: Int,
+        nestingMessage: MessageType,
+        messageSink: MessageSink
+    ) {
+        when (style) {
+            // delimiters mark this container's bounds: wherever its entries land inside them, they cannot
+            // mislead a reader about what holds them---only the container itself can sit deceptively
+            DELIMITED -> reportIfUnderNested(node, minNestingColumn, nestingMessage, messageSink)
+            // a plain container has no marks of its own: its entries are the only thing showing a reader
+            // where it sits, so each one answers for it
+            PLAIN -> entries.forEach { reportIfUnderNested(it, minNestingColumn, nestingMessage, messageSink) }
+        }
+    }
+
+    private fun reportIfUnderNested(
+        node: AstNode,
+        minNestingColumn: Int,
+        nestingMessage: MessageType,
+        messageSink: MessageSink
+    ) {
+        if (node.location.start.column < minNestingColumn) {
+            messageSink.error(node.location.trimToFirstLine(), nestingMessage.create())
+        }
+    }
+
     /**
      * Validate that the leading entries of every object and list in the tree rooted at [node] line up with the
      * first entry of the object or list they belong to
@@ -102,7 +180,7 @@ class IndentValidator {
     private fun validateObjectAlignment(objNode: ObjectNode, messageSink: MessageSink) {
         validateAlignment(
             items = objNode.properties,
-            misalignmentMessage = OBJECT_PROPERTIES_MISALIGNED,
+            misalignmentMessage = objectPropertiesMisaligned.messageFor(objNode.style),
             messageSink
         ) { property ->
             if (property is ObjectPropertyNodeImpl) {
@@ -114,7 +192,7 @@ class IndentValidator {
     private fun validateListAlignment(listNode: ListNode, messageSink: MessageSink) {
         validateAlignment(
             items = listNode.elements,
-            misalignmentMessage = DASH_LIST_ITEMS_MISALIGNED,
+            misalignmentMessage = listElementsMisaligned.messageFor(listNode.style),
             messageSink
         ) { element ->
             if (element is ListElementNodeImpl) {
@@ -152,6 +230,27 @@ class IndentValidator {
             if (itemColumn != expectedColumn) {
                 messageSink.error(item.location.trimToFirstLine(), misalignmentMessage.create())
             }
+        }
+    }
+
+    /**
+     * A deceptive indentation problem, reported at the severity its surroundings warrant.
+     *
+     * Kson's plain syntax gives a reader nothing but the indentation to go on, so an indent that misplaces an
+     * entry there makes the document say something other than what it looks like it says: an error.  Inside
+     * `{}`, `<>` or `[]` the delimiters describe the structure whatever the indentation does, leaving the same
+     * indent merely untidy: a warning.
+     */
+    private class DeceptiveIndentMessage(
+        private val inPlainSyntax: MessageType,
+        private val inDelimitedSyntax: MessageType
+    ) {
+        /**
+         * The [MessageType] to report for an entry of an object or list with this [boundaryStyle]
+         */
+        fun messageFor(boundaryStyle: BoundaryStyle): MessageType = when (boundaryStyle) {
+            PLAIN -> inPlainSyntax
+            DELIMITED -> inDelimitedSyntax
         }
     }
 }
