@@ -88,7 +88,7 @@ class IndentValidator {
         nestingMessage: MessageType,
         messageSink: MessageSink,
     ) {
-        ensureSufficientIndent(node, node.properties, node.style, minNestingColumn, nestingMessage, messageSink)
+        reportIfUnderNested(node, minNestingColumn, nestingMessage, messageSink)
 
         node.properties.forEach { property ->
             if (property is ObjectPropertyNodeImpl) {
@@ -107,7 +107,7 @@ class IndentValidator {
         nestingMessage: MessageType,
         messageSink: MessageSink,
     ) {
-        ensureSufficientIndent(node, node.elements, node.style, minNestingColumn, nestingMessage, messageSink)
+        reportIfUnderNested(node, minNestingColumn, nestingMessage, messageSink)
 
         node.elements.forEach { element ->
             if (element is ListElementNodeImpl) {
@@ -127,35 +127,20 @@ class IndentValidator {
     }
 
     /**
-     * Ensures [node] is indented to at least [minNestingColumn], measuring it at whatever shows a reader
-     * where it sits, as determined by its [style]
-     *
-     * (Note: the slightly awkward args here allow us to handle both lists and objects for callers)
+     * Report [node] when it is indented less than [minNestingColumn] columns
      */
-    private fun ensureSufficientIndent(
-        node: KsonValueNode,
-        entries: List<AstNode>,
-        style: BoundaryStyle,
-        minNestingColumn: Int,
-        nestingMessage: MessageType,
-        messageSink: MessageSink
-    ) {
-        when (style) {
-            // delimiters mark this container's bounds: wherever its entries land inside them, they cannot
-            // mislead a reader about what holds them---only the container itself can sit deceptively
-            DELIMITED -> reportIfUnderNested(node, minNestingColumn, nestingMessage, messageSink)
-            // a plain container has no marks of its own: its entries are the only thing showing a reader
-            // where it sits, so each one answers for it
-            PLAIN -> entries.forEach { reportIfUnderNested(it, minNestingColumn, nestingMessage, messageSink) }
-        }
-    }
-
     private fun reportIfUnderNested(
         node: AstNode,
         minNestingColumn: Int,
         nestingMessage: MessageType,
         messageSink: MessageSink
     ) {
+        /**
+         * We can measure the indent of _any_ node by checking just its start column since by design that is where
+         * every node starts visually for a reader, whether it's an opening delimiter of any kind, an initial entry
+         * in a plain list or object, or the beginning of a leaf value. Indentation of sub-entries in any container
+         * is then validated in [validateNodeAlignment] as an alignment concern, not a nesting concern
+         */
         if (node.location.start.column < minNestingColumn) {
             messageSink.error(node.location.trimToFirstLine(), nestingMessage.create())
         }
