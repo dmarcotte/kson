@@ -24,13 +24,21 @@ import org.kson.parser.messages.MessageType.*
  * clear in some situations, that is not actively deceptive and so not flagged
  */
 class IndentValidator {
-    private val objectPropertiesMisaligned = DeceptiveIndentMessage(
-        PLAIN_OBJECT_PROPERTIES_MISALIGNED,
-        DELIMITED_OBJECT_PROPERTIES_MISALIGNED
+    private val objectPropertyOverIndented = DeceptiveIndentMessage(
+        PLAIN_OBJECT_PROPERTY_OVER_INDENTED,
+        DELIMITED_OBJECT_PROPERTY_OVER_INDENTED
     )
-    private val listElementsMisaligned = DeceptiveIndentMessage(
-        PLAIN_LIST_ELEMENTS_MISALIGNED,
-        DELIMITED_LIST_ELEMENTS_MISALIGNED
+    private val objectPropertyUnderIndented = DeceptiveIndentMessage(
+        PLAIN_OBJECT_PROPERTY_UNDER_INDENTED,
+        DELIMITED_OBJECT_PROPERTY_UNDER_INDENTED
+    )
+    private val listElementOverIndented = DeceptiveIndentMessage(
+        PLAIN_LIST_ELEMENT_OVER_INDENTED,
+        DELIMITED_LIST_ELEMENT_OVER_INDENTED
+    )
+    private val listElementUnderIndented = DeceptiveIndentMessage(
+        PLAIN_LIST_ELEMENT_UNDER_INDENTED,
+        DELIMITED_LIST_ELEMENT_UNDER_INDENTED
     )
     private val objectPropertyNesting = DeceptiveIndentMessage(
         PLAIN_OBJECT_PROPERTY_NESTING_ISSUE,
@@ -165,7 +173,8 @@ class IndentValidator {
     private fun validateObjectAlignment(objNode: ObjectNode, messageSink: MessageSink) {
         validateAlignment(
             items = objNode.properties,
-            misalignmentMessage = objectPropertiesMisaligned.messageFor(objNode.style),
+            overIndentedMessage = objectPropertyOverIndented.messageFor(objNode.style),
+            underIndentedMessage = objectPropertyUnderIndented.messageFor(objNode.style),
             messageSink
         ) { property ->
             if (property is ObjectPropertyNodeImpl) {
@@ -177,7 +186,8 @@ class IndentValidator {
     private fun validateListAlignment(listNode: ListNode, messageSink: MessageSink) {
         validateAlignment(
             items = listNode.elements,
-            misalignmentMessage = listElementsMisaligned.messageFor(listNode.style),
+            overIndentedMessage = listElementOverIndented.messageFor(listNode.style),
+            underIndentedMessage = listElementUnderIndented.messageFor(listNode.style),
             messageSink
         ) { element ->
             if (element is ListElementNodeImpl) {
@@ -186,9 +196,21 @@ class IndentValidator {
         }
     }
 
+    /**
+     * Validates that all elements in [items] are aligned on the left margin in the document so that visual presentation
+     * matches parsed structure. We try to give clear/helpful errors for these cases with [overIndentedMessage]
+     * and [underIndentedMessage]
+     *
+     * Alignment is judged against `items[0]` so that the alignment rules are consistent and easy to learn and apply.
+     * This also maps to how a user who is typing will encounter the error in an IDE: the first entry they write is
+     * guided into place by nesting validation, and every entry after it must line up with that. The pathological
+     * case---where the first entry is the only stray one, so every entry after it is reported instead of it---is
+     * not one we need to optimize for
+     */
     private fun <T : AstNode> validateAlignment(
         items: List<T>,
-        misalignmentMessage: MessageType,
+        overIndentedMessage: MessageType,
+        underIndentedMessage: MessageType,
         messageSink: MessageSink,
         validateChild: (T) -> Unit
     ) {
@@ -213,6 +235,11 @@ class IndentValidator {
             prevLine = item.location.end.line
             val itemColumn = item.location.start.column
             if (itemColumn != expectedColumn) {
+                val misalignmentMessage = if (itemColumn > expectedColumn) {
+                    overIndentedMessage
+                } else {
+                    underIndentedMessage
+                }
                 messageSink.error(item.location.trimToFirstLine(), misalignmentMessage.create())
             }
         }
