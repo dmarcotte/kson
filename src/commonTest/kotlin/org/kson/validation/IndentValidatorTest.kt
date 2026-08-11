@@ -512,7 +512,6 @@ class IndentValidatorTest {
                   # deceptive indent: nested under `key:`
                   - 9
                 # deceptive indent: must be aligned `key:`
-                # deceptive indent: nested under list with `key:`
                 deceptive_object:
                     key: x
                     list: - 
@@ -522,14 +521,13 @@ class IndentValidatorTest {
 
         // pinned with the (zero-based) line each message lands on, since a document deceptive in several ways
         // at once is exactly where it matters that every deception is named against the right entry: each of
-        // these four answers one of the "deceptive indent" comments in the source above
+        // these three answers one of the "deceptive indent" comments in the source above
         val badResult = KsonCore.parseToAst(badSource)
         assertEquals(
             listOf(
-                PLAIN_OBJECT_PROPERTIES_MISALIGNED to 7,
-                PLAIN_LIST_ELEMENT_NESTING_ISSUE to 7,
+                PLAIN_OBJECT_PROPERTIES_MISALIGNED to 6,
                 PLAIN_OBJECT_PROPERTY_NESTING_ISSUE to 4,
-                PLAIN_LIST_ELEMENT_NESTING_ISSUE to 11
+                PLAIN_LIST_ELEMENT_NESTING_ISSUE to 10
             ),
             badResult.messages.map { it.message.type to it.location.start.line }
         )
@@ -546,6 +544,113 @@ class IndentValidatorTest {
             """.trimIndent()
         val goodResult = KsonCore.parseToAst(goodSource)
         assertEquals(0, goodResult.messages.size)
+    }
+
+    /**
+     * A plain container's position is established by its first entry, so the nesting question is asked once,
+     * of that entry: an under-nested container is one problem, however many entries it has
+     */
+    @Test
+    fun testUnderNestedContainerIsReportedOnce() {
+        val result = KsonCore.parseToAst(
+            """
+                key:
+                - a
+                - b
+                - c
+            """.trimIndent()
+        )
+        assertEquals(
+            listOf(PLAIN_OBJECT_PROPERTY_NESTING_ISSUE to 1),
+            result.messages.map { it.message.type to it.location.start.line },
+            "one under-nested list, one message: its aligned elements all tell the same story"
+        )
+    }
+
+    /**
+     * An entry that does not start its own line has no indent, so such an entry can never have indentation
+     * errors/warnings. Here the trailing `c:2` sits left of the column `key:` demands, but
+     * only `b:1` is annotated as being under-nested
+     *
+     * This test guards the absence of a nesting check here: an entry with no indent of its own cannot be
+     * deceptive, so measuring it would only add a second report of a problem named elsewhere.
+     */
+    @Test
+    fun testEntriesTrailingOnALineAreNeverNestingChecked() {
+        val result = KsonCore.parseToAst(
+            """
+                    key:
+                      a: 1
+                b:1 c:2
+            """.trimIndent()
+        )
+        assertEquals(
+            listOf(PLAIN_OBJECT_PROPERTIES_MISALIGNED to 2),
+            result.messages.map { it.message.type to it.location.start.line }
+        )
+    }
+
+    /**
+     * When a plain container's first element is sufficiently indented, that container is considered
+     * well-nested and its subsequent entries are tested for alignment with that first element. This
+     * means we never report both a nesting error and an alignment error together on any single element;
+     * every element gets at most one good/helpful indentation error
+     */
+    @Test
+    fun testEntryStrayingFromWellPlacedContainerIsMisalignmentAlone() {
+        val result = KsonCore.parseToAst(
+            """
+                key:
+                  a: 1
+                b: 2
+            """.trimIndent()
+        )
+        assertEquals(
+            listOf(PLAIN_OBJECT_PROPERTIES_MISALIGNED to 2),
+            result.messages.map { it.message.type to it.location.start.line }
+        )
+    }
+
+    /**
+     * Verifies an example from `docs/readme.md` works as documented, having only the
+     * [PLAIN_LIST_ELEMENTS_MISALIGNED] error
+     */
+    @Test
+    fun testReadmeDeceptiveIndentationExample() {
+        val result = KsonCore.parseToAst(
+            """
+                teams:
+                  - name: 'Team A'
+                    members:
+                      - Alice
+                      - Bob
+                  - name: 'Team B'
+            """.trimIndent()
+        )
+        assertEquals(
+            listOf(PLAIN_LIST_ELEMENTS_MISALIGNED to 5),
+            result.messages.map { it.message.type to it.location.start.line }
+        )
+        assertTrue(result.hasErrors(), "the readme promises this document is rejected")
+    }
+
+    /**
+     * A container's position is defined by its first entry even when that entry trails its key: a trailing
+     * first entry sits past its key by construction, so this container cannot be under-nested.  The stray
+     * `- b` is one complaint: a misalignment with the container's first entry, not a nesting error
+     */
+    @Test
+    fun testTrailingFirstEntryStillDefinesContainerPosition() {
+        val result = KsonCore.parseToAst(
+            """
+                key: - a
+                - b
+            """.trimIndent()
+        )
+        assertEquals(
+            listOf(PLAIN_LIST_ELEMENTS_MISALIGNED to 1),
+            result.messages.map { it.message.type to it.location.start.line }
+        )
     }
 
     @Test
