@@ -1756,7 +1756,7 @@ class FormatterTest {
                 - key: value
             """.trimIndent(),
             """
-                [{key:value}key:value]
+                [{key:value}{key:value}]
             """.trimIndent(),
             formattingStyle = FormattingStyle.COMPACT
         )
@@ -1767,7 +1767,7 @@ class FormatterTest {
                 - key: value
             """.trimIndent(),
             """
-                [{key:true}key:value]
+                [{key:true}{key:value}]
             """.trimIndent(),
             formattingStyle = FormattingStyle.COMPACT
         )
@@ -1778,7 +1778,7 @@ class FormatterTest {
                 - key: value
             """.trimIndent(),
             """
-                [{key:3}key:value]
+                [{key:3}{key:value}]
             """.trimIndent(),
             formattingStyle = FormattingStyle.COMPACT
         )
@@ -1790,7 +1790,7 @@ class FormatterTest {
                 - key: value
             """.trimIndent(),
             """
-                nested:[[key:value]key:value]
+                nested:[[{key:value}]{key:value}]
             """.trimIndent(),
             formattingStyle = FormattingStyle.COMPACT
         )
@@ -1802,7 +1802,7 @@ class FormatterTest {
                 - key21: value2
             """.trimIndent(),
             """
-                [{key11:key12:value1}key21:value2]
+                [{key11:key12:value1}{key21:value2}]
             """.trimIndent(),
             formattingStyle = FormattingStyle.COMPACT
         )
@@ -1815,7 +1815,7 @@ class FormatterTest {
                 - key21: value2
             """.trimIndent(),
             """
-                [{key11:key12:key13:value1}key21:value2]
+                [{key11:key12:key13:value1}{key21:value2}]
             """.trimIndent(),
             formattingStyle = FormattingStyle.COMPACT
         )
@@ -2120,6 +2120,109 @@ class FormatterTest {
                 # one
                 # two
                 2]
+            """.trimIndent(),
+            formattingStyle = FormattingStyle.COMPACT
+        )
+    }
+
+    /**
+     * Regression test for a bug in compact formatting that would transfer a comment from a list to its list
+     * elements. Comments should not change what they are anchored to due to a format.
+     */
+    @Test
+    fun testCompactFormattingStyleKeepsElementCommentsAttached() {
+        assertFormatting(
+            """
+                # a comment
+                - a: 1
+                  b: 2
+            """.trimIndent(),
+            """
+                [
+                # a comment
+                {a:1 b:2}]
+            """.trimIndent(),
+            formattingStyle = FormattingStyle.COMPACT
+        )
+
+        assertFormatting(
+            """
+                - z: 0
+                # a comment
+                - a: 1
+            """.trimIndent(),
+            """
+                [
+                {z:0}
+                # a comment
+                {a:1}]
+            """.trimIndent(),
+            formattingStyle = FormattingStyle.COMPACT
+        )
+
+        assertFormatting(
+            """
+                - 1
+                # a comment
+                - a: 2
+            """.trimIndent(),
+            """
+                - 1
+                # a comment
+                - a: 2
+            """.trimIndent()
+        )
+    }
+
+    /**
+     * Regression test against a blank line in compact formatting where an object element is followed by a
+     * commented one, from the object and the list each supplying the line break the comment needs
+     */
+    @Test
+    fun testCompactFormattingStyleCommentedElementAfterObject() {
+        assertFormatting(
+            """
+                - a: 1
+                # a comment
+                - 2
+            """.trimIndent(),
+            """
+                [
+                {a:1}
+                # a comment
+                2]
+            """.trimIndent(),
+            formattingStyle = FormattingStyle.COMPACT
+        )
+    }
+
+    /**
+     * Regression test against empty objects having an unnecessary trailing space in compact formatting
+     */
+    @Test
+    fun testCompactFormattingStyleEmptyObject() {
+        assertFormatting(
+            """
+                - {}
+                - a: 1
+            """.trimIndent(),
+            """
+                [{}{a:1}]
+            """.trimIndent(),
+            formattingStyle = FormattingStyle.COMPACT
+        )
+
+        assertFormatting(
+            """
+                - {}
+                # a comment
+                - a: 1
+            """.trimIndent(),
+            """
+                [
+                {}
+                # a comment
+                {a:1}]
             """.trimIndent(),
             formattingStyle = FormattingStyle.COMPACT
         )
