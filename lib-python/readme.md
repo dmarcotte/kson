@@ -101,7 +101,7 @@ key:
 | `FormattingStyle.PLAIN` | YAML-like format (default) |
 | `FormattingStyle.CLASSIC` | Standard JSON format with braces and quotes |
 | `FormattingStyle.DELIMITED` | JSON-like with explicit delimiters |
-| `FormattingStyle.COMPACT` | Minified single-line output |
+| `FormattingStyle.COMPACT` | Minified output |
 
 ### Indentation
 
