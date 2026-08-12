@@ -1449,6 +1449,25 @@ class FormatterTest {
         )
     }
 
+    @Test
+    fun testCompactFormattingStyleObjectEndingInInvalidProperty() {
+        /**
+         * Asserted directly rather than through [assertFormatting], whose round trip and idempotency checks describe
+         * valid documents: formatting an invalid one is not currently a fixed point
+         */
+        assertEquals(
+            "a:b:1 : 2 .c:3",
+            format(
+                """
+                    a: {b: 1
+                    : 2}
+                    c: 3
+                """.trimIndent(),
+                KsonFormatterConfig(formattingStyle = FormattingStyle.COMPACT)
+            )
+        )
+    }
+
     /**
      * If a Kson document is fairly well-formed but has some unexpected trialing content, we should still
      * be able to format the valid portion of the document
