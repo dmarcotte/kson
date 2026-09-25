@@ -27,6 +27,14 @@ each editor and ensures that features are implemented in one place, improving pe
 pnpm install
 ```
 
+The `kson` and `kson-tooling` dependencies are `file:` imports of the Kotlin/JS builds under `kson-lib` and
+`kson-tooling-lib`, and `pnpm install` keeps whatever copies of them it already has.  To install against a
+rebuilt core, use the Gradle task, which imports them afresh:
+
+```bash
+./gradlew tooling:language-server-protocol:npmInstall
+```
+
 ### Build
 
 To compile the TypeScript source code, run:

@@ -8,9 +8,8 @@ tasks {
         // hoisted keeps a flat node_modules (npm-identical layout) while still
         // hardlinking from pnpm's shared global store.
         command=listOf("pnpm", "install", "--frozen-lockfile", "--config.node-linker=hoisted")
-        dependsOn(":kson-lib:jsNodeProductionLibraryDistribution")
-        dependsOn(":kson-tooling-lib:jsNodeProductionLibraryDistribution")
         doNotTrackState("pnpm already tracks its own state")
+        reinstallLocallyBuiltPackages(LocallyBuiltPackage.KSON, LocallyBuiltPackage.KSON_TOOLING)
     }
 
     register<PixiExecTask>("npm_run_compile") {

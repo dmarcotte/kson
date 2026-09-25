@@ -10,6 +10,11 @@ tasks {
         command=listOf("pnpm", "install", "--frozen-lockfile", "--config.node-linker=hoisted")
         doNotTrackState("pnpm already tracks its own state")
         dependsOn(":tooling:language-server-protocol:npm_run_test")
+        reinstallLocallyBuiltPackages(
+            LocallyBuiltPackage.KSON,
+            LocallyBuiltPackage.KSON_TOOLING,
+            LocallyBuiltPackage.KSON_LANGUAGE_SERVER
+        )
     }
 
     val playwrightInstall = register<PixiExecTask>("playwrightInstall") {
