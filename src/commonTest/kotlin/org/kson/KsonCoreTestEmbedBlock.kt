@@ -1107,4 +1107,60 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
         // the same document after an editor trims the blank line should yield the same value when parsed
         assertParsesTo("block: %\n  first\n\n  second\n  %%", expectedKson, expectedYaml, expectedJson)
     }
+
+    @Test
+    fun testEmbedBlockPreservesCrlfLineEndings() {
+        // CRLFs inside the content are part of its value, but the line endings that end the preamble and the
+        // line before an own-line closing delimiter are embed block syntax, rendered here as `\n`
+        assertParsesTo(
+            "block: %sql\r\n  a\r\n  b\r\n  %%\r\n",
+            "block: %sql\n  a\r\n  b\n  %%",
+            "block: \"a\\r\\nb\"",
+            """
+                {
+                  "block": "a\r\nb"
+                }
+            """.trimIndent()
+        )
+
+        // content which itself ends in a CRLF
+        assertParsesTo(
+            "block: %\r\n  a\r\n\r\n  %%",
+            "block: %\n  a\r\n  \n  %%",
+            "block: \"a\\r\\n\"",
+            """
+                {
+                  "block": "a\r\n"
+                }
+            """.trimIndent()
+        )
+    }
+
+    @Test
+    fun testEmbedBlockPreservesLoneCarriageReturns() {
+        // a lone `\r` is not a line ending, so it is simply part of the content
+        assertParsesTo(
+            "block: %\n  a\rb\n  %%",
+            "block: %\n  a\rb\n  %%",
+            "block: \"a\\rb\"",
+            """
+                {
+                  "block": "a\rb"
+                }
+            """.trimIndent()
+        )
+
+        // ...including at the end of the content, where it must not merge with a newline before the closing
+        // delimiter: that would make a CRLF, which the closing delimiter's own line would then strip
+        assertParsesTo(
+            "block: %\n  a\r%%",
+            "block: %\n  a\r%%",
+            "block: \"a\\r\"",
+            """
+                {
+                  "block": "a\r"
+                }
+            """.trimIndent()
+        )
+    }
 }

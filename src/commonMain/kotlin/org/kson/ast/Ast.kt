@@ -15,6 +15,7 @@ import org.kson.parser.TokenType.COMMENT
 import org.kson.parser.TokenType.WHITESPACE
 import org.kson.parser.behavior.IdentityContentTransformer
 import org.kson.parser.behavior.KsonContentTransformer
+import org.kson.parser.behavior.Line
 import org.kson.parser.behavior.StringQuote
 import org.kson.parser.behavior.StringQuote.*
 import org.kson.parser.behavior.StringUnquoted
@@ -962,7 +963,7 @@ class EmbedBlockNode(
      */
     private fun renderYamlFormat(indent: Indent, compileTarget: Yaml): String {
         return if (!compileTarget.retainEmbedTags) {
-            renderMultilineYamlString(embedContent, indent, indent.next(false))
+            renderYamlEmbedContent(embedContent, indent, indent.next(false))
         } else {
             renderYamlObject(indent)
         }
@@ -1015,7 +1016,25 @@ class EmbedBlockNode(
 
         return embedTagLine +
                 "${indent.firstLineIndent()}${EmbedObjectKeys.EMBED_CONTENT.key}: " +
-                renderMultilineYamlString(embedContent, indent.clone(true), indent.next(true))
+                renderYamlEmbedContent(embedContent, indent.clone(true), indent.next(true))
+    }
+
+    /**
+     * Renders embed content as a YAML string, preferring a literal block scalar.  Block scalars normalize every line
+     * break to `\n`, and YAML counts a lone `\r` as a line break, so content containing a `\r` is rendered as a
+     * double-quoted scalar instead to keep its value exact
+     *
+     * @param content The embed content to render
+     * @param indent The base indentation level
+     * @param contentIndent Additional indentation to apply to the content of a block scalar
+     * @return the YAML-formatted string
+     */
+    private fun renderYamlEmbedContent(content: String, indent: Indent, contentIndent: Indent): String {
+        return if (content.contains('\r')) {
+            indent.firstLineIndent() + "\"${renderForYamlDoubleQuotedString(content)}\""
+        } else {
+            renderMultilineYamlString(content, indent, contentIndent)
+        }
     }
 
     /**
@@ -1140,17 +1159,30 @@ internal object EmbedBlockRenderer {
         return when (formattingStyle) {
             PLAIN, DELIMITED -> {
                 val contentIndent = if (nestedContentIndent) indent.next(false) else indent
-                val indentedContent = escapedContent.lines()
-                    .joinToString("\n${contentIndent.bodyLinesIndent()}")
+                val bodyIndent = contentIndent.bodyLinesIndent()
+                val indentedContent = Line.splitToLines(escapedContent)
+                    .joinToString("") { line -> bodyIndent + line.text + line.ending }
 
                 "${indent.firstLineIndent()}${delimiter.openDelimiter}$preamble\n" +
-                    "${contentIndent.bodyLinesIndent()}$indentedContent\n" +
-                    "${contentIndent.bodyLinesIndent()}${delimiter.closeDelimiter}"
+                    indentedContent +
+                    closeDelimiterSeparator(escapedContent, bodyIndent) +
+                    delimiter.closeDelimiter
             }
             COMPACT -> {
-                "${delimiter.openDelimiter}$preamble\n$escapedContent\n${delimiter.closeDelimiter}"
+                "${delimiter.openDelimiter}$preamble\n$escapedContent" +
+                    closeDelimiterSeparator(escapedContent, "") +
+                    delimiter.closeDelimiter
             }
             CLASSIC -> throw ShouldNotHappenException("Embed blocks are not rendered in CLASSIC format, which is JSON")
         }
     }
+
+    /**
+     * The separator between rendered embed [content] and its closing delimiter: a newline then [indent], putting the
+     * delimiter on its own line, unless [content] ends in `\r`. That `\r` and our newline would form a CRLF, and
+     * since the line ending before an own-line closing delimiter is embed block syntax rather than content, the `\r`
+     * would be lost. The delimiter directly follows such content instead.
+     */
+    private fun closeDelimiterSeparator(content: String, indent: String): String =
+        if (content.endsWith('\r')) "" else "\n$indent"
 }

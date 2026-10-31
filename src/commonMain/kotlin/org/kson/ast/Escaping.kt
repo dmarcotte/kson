@@ -41,6 +41,39 @@ fun renderForJsonString(content: String): String {
 }
 
 /**
+ * Render the given string for inclusion in a YAML double-quoted scalar, such that the scalar's value is exactly
+ * [content].  Unlike [renderForJsonString], characters outside the Basic Multilingual Plane are written as-is, since
+ * YAML parsers may not recombine JSON-style surrogate pair escapes (PyYAML, for instance, decodes them as two lone
+ * surrogates).
+ *
+ * Line breaks are escaped, since YAML folds raw line breaks in double-quoted scalars.  Control characters are
+ * escaped too, since YAML does not allow most of them raw in a document (see "c-printable" in the
+ * [YAML 1.2 spec](https://yaml.org/spec/1.2.2/#51-character-set)), and escaping the C1 range also covers U+0085,
+ * which YAML 1.1 parsers treat as a line break.
+ *
+ * @param content The string to escape
+ * @return The given [content], prepared for inclusion in a YAML double-quoted scalar
+ */
+fun renderForYamlDoubleQuotedString(content: String): String {
+    val sb = StringBuilder(content.length + 2)
+
+    for (char in content) {
+        when {
+            char == '"' -> sb.append("\\\"")
+            char == '\\' -> sb.append("\\\\")
+            char == '\n' -> sb.append("\\n")
+            char == '\r' -> sb.append("\\r")
+            char == '\t' -> sb.append("\\t")
+            char.code < 0x20 || char.code in 0x7F..0x9F -> appendUnicodeEscape(sb, char.code)
+            char == '\uFFFE' || char == '\uFFFF' -> appendUnicodeEscape(sb, char.code)
+            else -> sb.append(char)
+        }
+    }
+
+    return sb.toString()
+}
+
+/**
  * Kson strings allow raw whitespace, but otherwise escapes are identical to Json (modulo which [StringQuote] the
  * Kson string uses), so this function can help prepare an escaped Kson string for rendering as a Json string
  *

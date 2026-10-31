@@ -272,16 +272,32 @@ class FormatterTest {
 
     @Test
     fun testEmbedBlockWithCRLFLineEndings() {
-        // The \r of each CRLF must not leak into the embed tag or content, where it would be rendered
-        // as a literal `\r` in the tag and an extra blank line in the content on every format
+        // The CRLF ending the preamble must not leak a `\r` into the embed tag.  The CRLF inside the content is
+        // part of its value and must be kept, while the line endings that end the preamble and precede the
+        // closing delimiter are embed block syntax, which the formatter writes as `\n`
         assertFormatting(
             "code: %python\r\n  print(1)\r\n  print(2)\r\n  %%\r\n",
-            """
-            code: %python
-              print(1)
-              print(2)
-              %%
-            """.trimIndent()
+            "code: %python\n  print(1)\r\n  print(2)\n  %%"
+        )
+    }
+
+    @Test
+    fun testCompactEmbedBlockEndingInCarriageReturn() {
+        // the closing delimiter must directly follow content ending in a lone `\r`, since a newline there would
+        // form a CRLF that the closing delimiter's own line would strip from the content
+        assertFormatting(
+            "code: %\n  a\r%%",
+            "code:%\na\r%%",
+            formattingStyle = FormattingStyle.COMPACT
+        )
+    }
+
+    @Test
+    fun testEmbedRuleKeepsCrlfLineEndings() {
+        assertFormatting(
+            "script: \"a\\r\\nb\"",
+            "script: %\n  a\r\n  b\n  %%",
+            embedBlockRules = listOf(embedRule("/script")),
         )
     }
 

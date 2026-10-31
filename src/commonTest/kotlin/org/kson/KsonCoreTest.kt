@@ -108,5 +108,12 @@ interface KsonCoreTest {
             message
         )
 
+        // the Kson we transpiled must represent the same value as its source
+        val transpiledKsonJson = KsonCore.parseToJson(ksonParseResult.kson!!, compileSettings.jsonSettings)
+        assertEquals(
+            expectedJson,
+            transpiledKsonJson.json,
+            "Our transpiled Kson must have the same value as its source"
+        )
     }
 }
