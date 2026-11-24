@@ -78,12 +78,21 @@ class KsonCoreTestEmbedBlockError : KsonCoreTestError {
             "%my\u0001tag\ncontent%%",
             listOf(STRING_CONTROL_CHARACTER)
         )
+
+        // An embed tag is a KSON string, so a raw tab must be escaped there too
+        assertParserRejectsSource(
+            "%my\ttag\ncontent%%",
+            listOf(STRING_CONTROL_CHARACTER)
+        )
     }
 
     @Test
     fun testEmbedBlockObjectValidatesItsStrings() {
         assertParserRejectsSource("embedTag: x\nembedContent: 'a\\xb'", listOf(STRING_BAD_ESCAPE))
         assertParserRejectsSource("embedTag: x\nembedContent: 'a\u0001b'", listOf(STRING_CONTROL_CHARACTER))
+        assertParserRejectsSource("embedTag: x\nembedContent: 'line1\nline2'", listOf(STRING_CONTROL_CHARACTER))
+        assertParserRejectsSource("embedTag: x\nembedContent: 'a\tb'", listOf(STRING_CONTROL_CHARACTER))
+        assertParserRejectsSource("embedTag: 'my\ttag'\nembedContent: content", listOf(STRING_CONTROL_CHARACTER))
     }
 
     @Test

@@ -29,17 +29,8 @@ import org.kson.stdlibx.exceptions.ShouldNotHappenException
 /**
  * Validates that all strings for a given [KsonRoot] contain only valid KSON strings, i.e. strings which exactly follow
  * the JSON String rules specified in [Section 7. Strings of RFC8259](https://datatracker.ietf.org/doc/html/rfc8259#section-7),
- * with a KSON-specific allowance for raw whitespace characters, and with single-quoted strings behaving symmetrically
- * to double-quoted strings, escaping `'` in place of `"` (see [StringQuote])
- *
- * [KsonStringValidator] walks the AST rooted to find [org.kson.ast.QuotedStringNode] instances ([UnquotedStringNode]s
- * need no validation since due to their character restrictions, they cannot be lexed in error) and validates their
- * raw string content for:
- * - Invalid escape sequences (`\x` where x is not a valid escape character)
- * - Escapes of a non-delimiting quote (i.e. `\'` in a double-quoted string, or `\"` in a
- *   single-quoted string, or either quote in an embed tag, which is not delimited by quotes)
- * - Invalid unicode escapes (`\uXXXX` where XXXX is not 4 valid hex digits)
- * - Illegal control characters (0x00-0x1F except whitespace: `\n`, `\r`, `\t`)
+ * with the single extension of allowing single-quoted strings, which behave symmetrically to double-quoted strings,
+ * escaping `'` in place of `"` (see [StringQuote])
  */
 class KsonStringValidator {
     fun validate(ast: KsonRoot, messageSink: MessageSink) {
@@ -113,8 +104,8 @@ class KsonStringValidator {
         while (!scanner.eof()) {
             val char = scanner.peek()
 
-            // Check for illegal control characters (0x00-0x1F except whitespace)
-            if (char.code in 0x00..0x1F && !isWhitespace(char)) {
+            // Check for illegal control characters (0x00-0x1F)
+            if (char.code in 0x00..0x1F) {
                 messageSink.error(scanner.currentLocation(), MessageType.STRING_CONTROL_CHARACTER.create(char.toString()))
                 scanner.advance()
                 continue

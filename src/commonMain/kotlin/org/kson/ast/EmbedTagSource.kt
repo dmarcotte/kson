@@ -38,8 +38,9 @@ internal class EmbedTagSource private constructor(private val escapedTag: String
 
         fun fromTagNode(embedTagNode: StringNodeImpl): EmbedTagSource {
             /**
-             * [StringNodeImpl.delimiterUnescapedRawContent] already holds almost all the escapes we want. We also
-             * escape raw whitespace to ensure we don't include any raw newlines that would prematurely end this tag
+             * [StringNodeImpl.delimiterUnescapedRawContent] already holds all the escapes a valid tag needs. A document
+             * formatted despite errors may still hold raw whitespace, so we escape it to ensure we don't include any
+             * raw newlines that would prematurely end this tag
              */
             return EmbedTagSource(escapeRawWhitespace(embedTagNode.delimiterUnescapedRawContent))
         }

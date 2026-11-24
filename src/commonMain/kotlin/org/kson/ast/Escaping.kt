@@ -41,10 +41,9 @@ fun renderForJsonString(content: String): String {
 }
 
 /**
- * KSON strings allow raw whitespace, but otherwise escapes are identical to Json (modulo which [StringQuote] the
- * KSON string uses), so this function can help prepare an escaped KSON string for rendering as a Json string
+ * Escape the raw tabs, newlines and carriage returns in the given KSON string
  *
- * @param ksonEscapedString a string escaped according to KSON string escaping rules
+ * @param ksonEscapedString a string with KSON escapes intact, which may also hold raw tabs, newlines or carriage returns
  * @return a string escaped according to Json's rules (modulo the [StringQuote] of the [ksonEscapedString])
  */
 fun escapeRawWhitespace(ksonEscapedString: String): String {

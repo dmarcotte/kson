@@ -133,8 +133,7 @@ class DuplicateKeyValidatorTest {
         val source = """
             # these two keys are identical in spite of being represented differently
             'key with\nnewline': 1
-            'key with
-            newline': 1
+            'key with\u000Anewline': 1
         """.trimIndent()
 
         val messages = KsonCore.parseToAst(source).messages

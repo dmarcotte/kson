@@ -742,17 +742,17 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
     }
 
     @Test
-    fun testEmbedBlockFromObjectWithLiteralNewlineInTag() {
+    fun testEmbedBlockFromObjectWithNewlineEscapeInTag() {
         val compileSettings = KsonCoreTest.CompileSettings(
             yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
             jsonSettings = Json(retainEmbedTags = true)
         )
 
+        // a raw newline always ends an embed tag, so a tag holding a newline must keep it escaped
         assertParsesTo(
             """
                 embedBlock:
-                  embedTag: "line1
-                line2"
+                  embedTag: "line1\nline2"
                   embedContent: content""".trimIndent(),
             """
                 embedBlock: %line1\nline2
@@ -849,34 +849,6 @@ class KsonCoreTestEmbedBlock : KsonCoreTest {
         assertEmbedTagRoundTrips("'%sql'", "%%sql")
         assertEmbedTagRoundTrips("'%'", "%%")
         assertEmbedTagRoundTrips("'%%'", "%%%")
-    }
-
-    @Test
-    fun testEmbedBlockTagWithLiteralTabInJsonObjectRendering() {
-        val compileSettings = KsonCoreTest.CompileSettings(
-            yamlSettings = CompileTarget.Yaml(retainEmbedTags = true),
-            jsonSettings = Json(retainEmbedTags = true)
-        )
-
-        assertParsesTo(
-            "%my\ttag\ncontent%%",
-            """
-                %my\ttag
-                content
-                %%
-            """.trimIndent(),
-            """
-                  embedTag: "my\ttag"
-                  embedContent: |
-                    content
-            """.trimIndent(),
-            """
-                {
-                  "embedTag": "my\ttag",
-                  "embedContent": "content"
-                }
-            """.trimIndent(), compileSettings = compileSettings
-        )
     }
 
     @Test

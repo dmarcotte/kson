@@ -1,5 +1,6 @@
 package org.kson.parser.messages
 
+import org.kson.ast.renderForJsonString
 import org.kson.parser.behavior.StringUnquoted
 import org.kson.stdlibx.exceptions.ShouldNotHappenException
 
@@ -223,8 +224,9 @@ enum class MessageType(
             require(badControlCharArg?.length == 1) { "Expected arg to be a single control character" }
             val badControlChar = badControlCharArg[0]
 
-            return "Non-whitespace control characters must not be embedded directly in strings. " +
-                    "Please use the Unicode escape for this character instead: \"\\u${badControlChar.code.toString(16).uppercase().padStart(4, '0')}\""
+            val multiLineHint = if (badControlChar == '\n') " (for multi-line text, use an Embed Block)" else ""
+            return "Control characters must be escaped in strings$multiLineHint. " +
+                    "Please use the escape for this character instead: \"${renderForJsonString(badControlChar.toString())}\""
         }
     },
     STRING_BAD_UNICODE_ESCAPE {

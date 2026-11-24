@@ -41,27 +41,6 @@ class KsonCoreTestString : KsonCoreTest {
     }
 
     @Test
-    fun testStringWithRawWhitespace() {
-        assertParsesTo(
-            """
-            |"This is a string with raw, unescaped whitespace ${'\t'}
-            |${'\t'}tabbed-indented second line"
-            """.trimMargin(),
-            """
-            |'This is a string with raw, unescaped whitespace ${'\t'}
-            |${'\t'}tabbed-indented second line'
-            """.trimMargin(),
-            """
-            |"This is a string with raw, unescaped whitespace ${'\t'}
-            |${'\t'}tabbed-indented second line"
-            """.trimMargin(),
-            """
-            |"This is a string with raw, unescaped whitespace \t\n\ttabbed-indented second line"
-            """.trimMargin()
-        )
-    }
-
-    @Test
     fun testStringEscapes() {
         assertParsesTo(
             """
@@ -459,16 +438,6 @@ class KsonCoreTestString : KsonCoreTest {
             "'\\u0041\\uFFFF\\u1234'",
             "\"\\u0041\\uFFFF\\u1234\"",
             "\"\\u0041\\uFFFF\\u1234\""
-        )
-    }
-
-    @Test
-    fun testWhitespaceControlCharactersAllowed() {
-        assertParsesTo(
-            "\"hello\tworld\"",
-            "'hello\tworld'",
-            "\"hello\tworld\"",
-            "\"hello\\tworld\""
         )
     }
 

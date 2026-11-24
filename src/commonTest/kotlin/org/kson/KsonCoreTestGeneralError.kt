@@ -50,9 +50,11 @@ class KsonCoreTestGeneralError: KsonCoreTestError {
 
         assertRejectsLoneSlashR("{\"a\": 1,\r\"b\": 2}") // between tokens
         assertRejectsLoneSlashR("# a comment\rkey: value\nother: value") // in a comment
-        assertRejectsLoneSlashR("key: \"a\rb\"") // in a quoted string
         assertRejectsLoneSlashR("key: %\n  a\rb\n  %%") // in embed content, on a later line
         assertRejectsLoneSlashR("key: value\r") // at the end of the source
+
+        // in a quoted string, any raw `\r` is an illegal control character
+        assertParserRejectsSource("key: \"a\rb\"", listOf(STRING_CONTROL_CHARACTER, LONE_CARRIAGE_RETURN))
 
         // the warning's location on a later line, after a `\n` and after a CRLF
         assertParserRejectsSourceWithLocation(
@@ -74,7 +76,7 @@ class KsonCoreTestGeneralError: KsonCoreTestError {
         )
 
         // CRLF line endings are not lone carriage returns
-        val crlfSource = "# comment\r\nkey: %\r\n  a\r\n\r\n  b\r\n  %%\r\nother: \"x\r\ny\"\r\n"
+        val crlfSource = "# comment\r\nkey: %\r\n  a\r\n\r\n  b\r\n  %%\r\n"
         assertEquals(emptyList(), KsonCore.parseToAst(crlfSource).messages)
     }
 

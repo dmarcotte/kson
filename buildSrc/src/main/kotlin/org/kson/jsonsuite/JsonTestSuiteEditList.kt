@@ -72,13 +72,11 @@ private val jsonTestSuiteEditList = mapOf(
     "n_structure_ascii-unicode-identifier.json" to JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "n_structure_unicode-identifier.json" to JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "n_string_single_string_no_double_quotes.json" to  JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
-    "n_string_unescaped_newline.json" to  JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "n_structure_capitalized_True.json" to  JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "n_structure_trailing_#.json" to JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "n_object_key_with_single_quotes.json" to  JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "n_object_single_quote.json" to  JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "n_string_single_quote.json" to  JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
-    "n_string_unescaped_tab.json" to  JsonTestEditType.ACCEPT_N_FOR_SUPERSET,
     "y_object_duplicated_key.json" to JsonTestEditType.SKIP_NEEDS_INVESTIGATION,
     "y_object_duplicated_key_and_value.json" to JsonTestEditType.SKIP_NEEDS_INVESTIGATION
 )

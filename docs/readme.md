@@ -74,13 +74,7 @@ One consequence of unquoted strings: a bare `true`, `false` or `null` is always 
 - "use slash to escape \"internal\" quotes"
 ```
 
-- KSON strings may contain raw, unescaped whitespace (though an [Embed Block](#embed-blocks) will usually be a better choice for multiline strings due to their editing ergonomics and indent-stripping)
-
-```kson
-'A string with
-a raw newline.
-	Tabs are also A-OK 👌'
-```
+As in JSON, a quoted string may not contain raw control characters such as newlines and tabs: escape them instead (`\n`, `\t`).  For multi-line text, use an [Embed Block](#embed-blocks).
 
 ## Lists
 
@@ -368,7 +362,7 @@ function fibonacci(n: number): number {
 
 ### Embed Tags
 
-An [Embed Tag](#embed-tags) adds metadata to an [Embed Block](#embed-blocks). An embed tag is a KSON [String](#strings) closed by the first raw newline rather than by a quote: quotes, punctuation and trailing whitespace are all ordinary tag characters&mdash;even a `%%` is welcome in a tag, since content begins only after the tag's newline. The one thing a tag cannot contain is a raw newline, which always ends the tag.
+An [Embed Tag](#embed-tags) adds metadata to an [Embed Block](#embed-blocks). An embed tag is a KSON [String](#strings) closed by the end of the line rather than by a quote: quotes, punctuation and trailing spaces are all ordinary tag characters&mdash;even a `%%` is welcome in a tag, since content begins only after the tag's newline.
 
 ```kson
 %this is an "embed tag": it is arbitrary metadata related to this content. In this case, the content is empty.

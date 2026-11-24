@@ -130,17 +130,6 @@ class SubParseableTest: KsonCoreTestError {
             // location of " quoted " in SRC-denoted KSON string
             Location.create(0, 10, 0, 18, 10, 18),
             Location.create(0, 16, 0, 24, 16, 24))
-
-        val ksonQuotedStringWithNewlines = """
-            key: 'SRCa quoted string
-            with newlines'
-        """.trimIndent()
-
-        assertSubLocationMessageLogged(
-            ksonQuotedStringWithNewlines,
-            // location of "ted string\nwith new" in SRC-denoted KSON string
-            Location.create(0, 8, 1, 8, 8, 27),
-            Location.create(0, 14, 1, 8, 14, 33))
     }
 
     @Test

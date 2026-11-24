@@ -680,8 +680,7 @@ abstract class StringNodeImpl(sourceTokens: List<Token>) : StringNode, KsonValue
      *
      * The remaining escapes are valid JSON string escapes, since KSON strings follow JSON string escaping rules
      * (see [RFC 8259 Section 7](https://datatracker.ietf.org/doc/html/rfc8259#section-7)). This means the value
-     * can be safely interpolated into JSON or YAML string contexts with only delimiter (quote) escaping and
-     * raw whitespace escaping (see [escapeRawWhitespace]) applied.
+     * can be safely interpolated into JSON or YAML string contexts with only delimiter (quote) escaping applied.
      */
     abstract val delimiterUnescapedRawContent: String
 
@@ -743,7 +742,7 @@ class QuotedStringNode(
     /**
      * Note: [rawStringContent] is the exact content of a [stringQuote]-delimited [Kson] string,
      *   including all escapes, but excluding any outer quotes. A [Kson] string is escaped identically to a Json string,
-     *   except that [Kson] allows raw whitespace to be embedded in strings
+     *   modulo which [stringQuote] delimits it
      */
     override val rawStringContent: String by lazy {
         renderTokens(sourceTokens)

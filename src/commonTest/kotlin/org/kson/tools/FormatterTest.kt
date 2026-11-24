@@ -306,6 +306,20 @@ class FormatterTest {
         )
     }
 
+    @Test
+    fun testRawNewlineInEmbedTagDoesNotEndTheTag() {
+        // A `%` embed tag ends at a raw newline, so formatting this object as an embed block must escape the raw
+        // newline in its `embedTag` string: left raw, it would end the tag early and turn `b` into content
+        assertFormatting(
+            "embedTag: 'a\nb'\nembedContent: x",
+            """
+            %a\nb
+            x
+            %%
+            """.trimIndent()
+        )
+    }
+
     /**
      * Regression test for an issue where our formatter was re-inserted embed blocks with escapes
      * processed, resulting in illegal KSON
